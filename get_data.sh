@@ -14,3 +14,6 @@ wget https://dr15.sdss.org/sas/dr15/manga/morphology/galaxyzoo/MaNGA_gz-v1_0_1.f
 
 #SWIFT
 wget https://data.sdss.org/sas/dr17/manga/swim/v4.1/SwiM_all_v4.fits
+
+#AGN
+wget https://data.sdss.org/sas/dr17/env/MANGA_AGN/v1_0_1/manga_agn-v1_0_1.fits

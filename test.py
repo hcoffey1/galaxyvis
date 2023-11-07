@@ -6,6 +6,7 @@ from astropy.table import Table
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
@@ -20,53 +21,39 @@ swift_fits_path="./data/SwiM_all_v4.fits"
 #swift_fits_path="./data/drpall-v3_1_1.fits"
 # Open the FITS file
 
-zoo_dat = Table.read(fits_file_path, format='fits')
-zoo_df = zoo_dat.to_pandas()
+def read_fits(fits_path):
+    dat = Table.read(fits_path, format='fits')
+    names = [name for name in dat.colnames if len(dat[name].shape) <= 1]
+    df = dat[names].to_pandas()
+    return df
 
-swift_dat = Table.read(swift_fits_path, format='fits')
-names = [name for name in swift_dat.colnames if len(swift_dat[name].shape) <= 1]
-swift_df = swift_dat[names].to_pandas()
-#swift_df = swift_dat.to_pandas()
+def clean_df(df):
+    #Remove outliers
+    df = df[merge_df['SFR_1RE'] >= -10] #May cause a crash
+    df = df.dropna(axis=1)
+    return df
 
-#with fits.open(fits_file_path) as hdul:
-#    # Get the primary header
-#    header = hdul[1].header
-#    print(hdul)
-#    
-#    # Access the data (assuming it's in the primary HDU)
-#    data = hdul[1].data
+def get_numeric_df(df):
+    #Remove non-numeric data
+    non_numeric_columns = df.select_dtypes(include=['object']).columns
+    df = df.drop(columns=non_numeric_columns)
+    return df
 
-
-#df = pd.DataFrame(data)
-print(zoo_df)
-print(swift_df)
-
-print("Trying merge")
+zoo_df = read_fits(fits_file_path)
+swift_df = read_fits(swift_fits_path)
 
 merge_df = (zoo_df.merge(swift_df, left_on='MANGAID', right_on='MANGAID'))
 
-merge_df.to_csv('merged.csv', index=False)
-
 #Remove outliers
-merge_df = merge_df[merge_df['SFR_1RE'] >= -10]
-merge_df = merge_df.dropna(axis=1)
-
+merge_df = clean_df(merge_df)
 #Remove non-numeric data
-non_numeric_columns = merge_df.select_dtypes(include=['object']).columns
-numeric_df = merge_df.drop(columns=non_numeric_columns)
+numeric_df = get_numeric_df(merge_df)
 
-
-print(numeric_df)
+#Select debiased columns
 debiased_columns = [col for col in numeric_df.columns if "debiased" in col]
 #for c in (debiased_columns):
 #    print(c)
-#exit(1)
-
-#Remove extra data values
-#dropped_columns=['nsa_id']
-#numeric_df = numeric_df.drop(columns=dropped_columns)
 numeric_df = numeric_df[debiased_columns]
-
 
 print("Numeric data----------")
 print(numeric_df)
@@ -78,6 +65,8 @@ scaled_df = scaler.fit_transform(numeric_df)
 #PCA
 pca = PCA(n_components=2)
 pca_df = pd.DataFrame(pca.fit_transform(scaled_df), columns=['pc1', 'pc2'])
+tsne_model = TSNE(n_components=2, perplexity=20, random_state=42)
+tsne_df = pd.DataFrame(tsne_model.fit_transform(scaled_df), columns=['tsne1', 'tsne2'])
 
 print(merge_df)
 print(pca_df)
@@ -85,17 +74,22 @@ print(pca_df)
 #Merge PCA back into original data
 merge_df = merge_df.reset_index(drop=True)
 pca_df = pca_df.reset_index(drop=True)
-merge_df = pd.concat([merge_df, pca_df], axis=1, ignore_index=False)
+tsne_df = tsne_df.reset_index(drop=True)
+merge_df = pd.concat([merge_df, pca_df, tsne_df], axis=1, ignore_index=False)
 
 print(merge_df)
-x = merge_df['pc1']
-y = merge_df['pc2']
-c = merge_df['SFR_1RE']
-#x = merge_df['T04_SPIRAL_A08_SPIRAL_WEIGHT'.lower()]
-#y = merge_df['SFR_1RE']
+#x1 = merge_df['pc1']
+#y1 = merge_df['pc2']
+c = merge_df['t04_spiral_a08_spiral_debiased']
+#c = merge_df['SFR_1RE']
 
-
-plt.scatter(x,y,c=c, cmap='viridis')
+x2 = merge_df['tsne1']
+y2 = merge_df['tsne2']
+#plt.scatter(x1,y1,c=c, cmap='viridis')
+#cbar = plt.colorbar()
+#cbar.set_label('SFR')
+#plt.show()
+plt.scatter(x2,y2,c=c, cmap='viridis')
 cbar = plt.colorbar()
 cbar.set_label('SFR')
 plt.show()
