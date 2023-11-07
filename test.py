@@ -4,6 +4,11 @@
 from astropy.io import fits
 from astropy.table import Table
 import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
 
 # Define the path to your FITS file
 #fits_file_path = "./data/MaNGA_GZD_auto-v1_0_1.fits"
@@ -38,10 +43,62 @@ print(swift_df)
 
 print("Trying merge")
 
-print(zoo_df.merge(swift_df, left_on='MANGAID', right_on='MANGAID'))
+merge_df = (zoo_df.merge(swift_df, left_on='MANGAID', right_on='MANGAID'))
 
-df1 = zoo_df
-df2 = swift_df 
+merge_df.to_csv('merged.csv', index=False)
+
+#Remove outliers
+merge_df = merge_df[merge_df['SFR_1RE'] >= -10]
+merge_df = merge_df.dropna(axis=1)
+
+#Remove non-numeric data
+non_numeric_columns = merge_df.select_dtypes(include=['object']).columns
+numeric_df = merge_df.drop(columns=non_numeric_columns)
+
+
+print(numeric_df)
+debiased_columns = [col for col in numeric_df.columns if "debiased" in col]
+#for c in (debiased_columns):
+#    print(c)
+#exit(1)
+
+#Remove extra data values
+#dropped_columns=['nsa_id']
+#numeric_df = numeric_df.drop(columns=dropped_columns)
+numeric_df = numeric_df[debiased_columns]
+
+
+print("Numeric data----------")
+print(numeric_df)
+
+#Scale data before PCA
+scaler = StandardScaler()
+scaled_df = scaler.fit_transform(numeric_df)
+
+#PCA
+pca = PCA(n_components=2)
+pca_df = pd.DataFrame(pca.fit_transform(scaled_df), columns=['pc1', 'pc2'])
+
+print(merge_df)
+print(pca_df)
+
+#Merge PCA back into original data
+merge_df = merge_df.reset_index(drop=True)
+pca_df = pca_df.reset_index(drop=True)
+merge_df = pd.concat([merge_df, pca_df], axis=1, ignore_index=False)
+
+print(merge_df)
+x = merge_df['pc1']
+y = merge_df['pc2']
+c = merge_df['SFR_1RE']
+#x = merge_df['T04_SPIRAL_A08_SPIRAL_WEIGHT'.lower()]
+#y = merge_df['SFR_1RE']
+
+
+plt.scatter(x,y,c=c, cmap='viridis')
+cbar = plt.colorbar()
+cbar.set_label('SFR')
+plt.show()
 
 # Check for overlap in the 'ID' column
 #shared_column = 'MANGAID'
