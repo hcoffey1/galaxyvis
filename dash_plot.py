@@ -31,7 +31,13 @@ def read_fits(fits_path):
 
 def clean_df(df):
     #Remove outliers
-    df = df[merge_df['SFR_1RE'] >= -20] #May cause a crash
+    #df = df[df['SFR_1RE'] >= -20] #May cause a crash
+    debiased_columns = [col for col in df.columns if "debiased" in col]
+    for col in debiased_columns:
+        #df[col] = df[col].apply(lambda x: x if 0 <= x <= 1 else None) 
+        df = df[df[col] >= 0] 
+        df = df[df[col] <= 1] 
+
     df = df.dropna(axis=1)
     return df
 
@@ -69,7 +75,8 @@ print("DUPS: ", zoo_concat.duplicated(subset='MANGAID').sum())
 
 #print(merge_df)
 
-merge_df = (zoo_concat.merge(swift_df, left_on='MANGAID', right_on='MANGAID'))
+merge_df = zoo_concat 
+#merge_df = (zoo_concat.merge(swift_df, left_on='MANGAID', right_on='MANGAID'))
 
 print("MERGE-------------------")
 #Remove outliers
@@ -85,6 +92,7 @@ debiased_columns = [col for col in numeric_df.columns if "debiased" in col]
 #for c in (debiased_columns):
 #    print(c)
 numeric_df = numeric_df[debiased_columns]
+#numeric_df = numeric_df[debiased_columns + ['SFR_1RE']]
 
 print("Numeric data----------")
 print(numeric_df)
@@ -96,7 +104,7 @@ scaled_df = scaler.fit_transform(numeric_df)
 #PCA
 pca = PCA(n_components=2)
 pca_df = pd.DataFrame(pca.fit_transform(scaled_df), columns=['pc1', 'pc2'])
-tsne_model = TSNE(n_components=2, perplexity=20, random_state=42)
+tsne_model = TSNE(n_components=2, perplexity=50, random_state=42)
 tsne_df = pd.DataFrame(tsne_model.fit_transform(scaled_df), columns=['tsne1', 'tsne2'])
 
 print(merge_df)
@@ -106,8 +114,10 @@ print(pca_df)
 merge_df = merge_df.reset_index(drop=True)
 pca_df = pca_df.reset_index(drop=True)
 tsne_df = tsne_df.reset_index(drop=True)
-merge_df = pd.concat([merge_df, pca_df, tsne_df], axis=1, ignore_index=False)
-merge_df['MANGAID'] = merge_df['MANGAID'].str.decode('utf-8')
+numeric_df = numeric_df.reset_index(drop=True)
+
+#merge_df = pd.concat([merge_df, pca_df, tsne_df], axis=1, ignore_index=False)
+merge_df = pd.concat([numeric_df, merge_df['MANGAID'], tsne_df], axis=1, ignore_index=False)
 
 # Sample data (replace this with your data)
 data = {
