@@ -175,7 +175,7 @@ def click_data_point(clickData):
         
         # Assuming 'URL' is a column in your DataFrame containing the URLs
         mangaID = df.loc[clicked_point_data['pointIndex'], 'MANGAID']
-        url = "https://dr15.sdss.org/marvin/galaxy/" + mangaID + "/"
+        url = "https://dr15.sdss.org/marvin/galaxy/" + mangaID.strip() + "/"
 
         # Check if a URL exists for the clicked point
         if url:
