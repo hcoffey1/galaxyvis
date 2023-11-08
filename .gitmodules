@@ -1,0 +1,3 @@
+[submodule "mangadap"]
+	path = mangadap
+	url = https://github.com/sdss/mangadap.git
