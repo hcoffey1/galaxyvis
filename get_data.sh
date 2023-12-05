@@ -17,3 +17,6 @@ wget https://data.sdss.org/sas/dr17/manga/swim/v4.1/SwiM_all_v4.fits
 
 #AGN
 wget https://data.sdss.org/sas/dr17/env/MANGA_AGN/v1_0_1/manga_agn-v1_0_1.fits
+
+#DAPALL
+wget https://data.sdss.org/sas/dr17/manga/spectro/analysis/v3_1_1/3.1.0/dapall-v3_1_1-3.1.0.fits
