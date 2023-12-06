@@ -210,11 +210,12 @@ app.layout = html.Div([
         options=[{'label': col, 'value': col} for col in df.columns[2:]],
         value=df.columns[2],  # Initial value
     ),
+
     dcc.Dropdown(id="embedding-selector", 
                  options=[{'label': option, 'value': option} for option in embedding_options],
                  value=embedding_options[0]
                  ),
-    html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
+
     dcc.Loading(
     id='loading-indicator',
     type='circle',  # or 'default'
@@ -222,7 +223,60 @@ app.layout = html.Div([
         dcc.Graph(id='scatterplot'),
         ]
     ),
+
+    html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
+
+    html.Details([
+        html.Summary('Show/Hide Boxes'),
+        #html.Div(id='checkbox-container')
+        html.Div([
+            html.H3("Galaxy Zoo"),
+            dcc.Checklist(
+                id='galaxy-zoo-checklist',
+                options=[
+                    {'label': col, 'value': col}
+                    for col in df.columns if 'debiased' in col
+                ],
+                value=[],
+            )
+        ]
+        ),
+
+        html.Div([
+            html.H3("Other"),
+            dcc.Checklist(
+                id='other-checklist',
+                options=[
+                    {'label': col, 'value': col}
+                    for col in df.columns if not 'debiased' in col
+                ],
+                value=[],
+            )
+        ]
+        )
+    ]),
+
 ])
+
+## Callback to update checkboxes based on DataFrame columns
+#@app.callback(
+#    Output('checkbox-container', 'children'),
+#    Input('checkbox-container', 'id')
+#)
+#def update_checkboxes(_):
+#    print("update")
+#    checkboxes = []
+#
+#    # Add a checkbox for each column in the DataFrame
+#    for column in df.columns:
+#        checkbox = dcc.Checklist(
+#            id={'type': 'checkbox', 'index': column},
+#            options=[{'label': column, 'value': column}],
+#            value=[column] if column in df.columns else [],
+#        )
+#        checkboxes.append(checkbox)
+#
+#    return checkboxes
 
 @app.callback(
     Output('scatterplot', 'figure'),
