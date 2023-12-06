@@ -226,10 +226,12 @@ app.layout = html.Div([
             html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
 
             html.Div([
+                html.Label("Embedding Method"),
                 dcc.Dropdown(id="embedding-selector", 
                             options=[{'label': option, 'value': option} for option in embedding_options],
                             value=embedding_options[0]
                             ),
+                html.Div(id='embedding-param-container', children=[])
             ], style={'width': '25%'}),
 
             html.Details([
@@ -255,7 +257,6 @@ app.layout = html.Div([
                             {'label': col, 'value': col}
                             for col in df.columns if not 'debiased' in col
                         ],
-                        #value=[],
                     )
                 ]
                 )
@@ -263,6 +264,28 @@ app.layout = html.Div([
         ], style={'width': '50%'}),
     ], style={'display': 'flex'}),
 ])
+
+# Callback to update additional inputs based on embedding choice
+@app.callback(
+    Output('embedding-param-container', 'children'),
+    Input('embedding-selector', 'value')
+)
+def update_additional_inputs(selected_option):
+    if selected_option == 'tsne':
+        # If tsne is selected, display additional parameters 
+        return [
+            html.Div([
+                html.Label("Perplexity:"),
+                dcc.Input(id='perplexity-input', type='number', value=100),
+            ]),
+            html.Div([
+                html.Label("Random Seed (-1 : Random):"),
+                dcc.Input(id='seed-input', type='number', value=-1),
+            ]),
+        ]
+    else:
+        # If no embedding parameters, display an empty container
+        return []
 
 ## Callback to update checkboxes based on DataFrame columns
 #@app.callback(
@@ -290,8 +313,10 @@ app.layout = html.Div([
     Input('color-selector', 'value'),
     Input('regen-button', 'n_clicks'),
     State('embedding-selector', 'value'),
+    State('perplexity-input', 'value'),
+    State('seed-input', 'value'),
 )
-def update_scatterplot(selected_color, n_clicks, embedding_choice):
+def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, seed):
     global df
     global PLOT_XY 
     global scaled_df 
