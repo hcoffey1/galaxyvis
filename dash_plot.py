@@ -201,7 +201,7 @@ df = merge_df
 
 app = dash.Dash(__name__)
 
-embedding_options=['tsne', 'pca']
+embedding_options=['pca', 'tsne']
 
 app.layout = html.Div([
     html.H1("MaNGA Galaxy Visualizer"),
@@ -211,51 +211,57 @@ app.layout = html.Div([
         value=df.columns[2],  # Initial value
     ),
 
-    dcc.Dropdown(id="embedding-selector", 
-                 options=[{'label': option, 'value': option} for option in embedding_options],
-                 value=embedding_options[0]
-                 ),
-
-    dcc.Loading(
-    id='loading-indicator',
-    type='circle',  # or 'default'
-    children=[
-        dcc.Graph(id='scatterplot'),
-        ]
-    ),
-
-    html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
-
-    html.Details([
-        html.Summary('Show/Hide Boxes'),
-        #html.Div(id='checkbox-container')
+    html.Div([
         html.Div([
-            html.H3("Galaxy Zoo"),
-            dcc.Checklist(
-                id='galaxy-zoo-checklist',
-                options=[
-                    {'label': col, 'value': col}
-                    for col in df.columns if 'debiased' in col
-                ],
-                value=[],
-            )
-        ]
-        ),
+            dcc.Loading(
+            id='loading-indicator',
+            type='circle',  # or 'default'
+            children=[
+                dcc.Graph(id='scatterplot'),
+                ]
+            ),
+        ], style={'flex': '1', 'width': '50%'}),
 
         html.Div([
-            html.H3("Other"),
-            dcc.Checklist(
-                id='other-checklist',
-                options=[
-                    {'label': col, 'value': col}
-                    for col in df.columns if not 'debiased' in col
-                ],
-                value=[],
-            )
-        ]
-        )
-    ]),
+            html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
 
+            html.Div([
+                dcc.Dropdown(id="embedding-selector", 
+                            options=[{'label': option, 'value': option} for option in embedding_options],
+                            value=embedding_options[0]
+                            ),
+            ], style={'width': '25%'}),
+
+            html.Details([
+                html.Summary('Show/Hide Boxes'),
+                html.Div([
+                    html.H3("Galaxy Zoo"),
+                    dcc.Checklist(
+                        id='galaxy-zoo-checklist',
+                        options=[
+                            {'label': col, 'value': col}
+                            for col in df.columns if 'debiased' in col
+                        ],
+                        value=df.columns[df.columns.str.contains('debiased')].tolist(),
+                    )
+                ]
+                ),
+
+                html.Div([
+                    html.H3("Other"),
+                    dcc.Checklist(
+                        id='other-checklist',
+                        options=[
+                            {'label': col, 'value': col}
+                            for col in df.columns if not 'debiased' in col
+                        ],
+                        #value=[],
+                    )
+                ]
+                )
+            ], style={'width': 'max-content'}),
+        ], style={'width': '50%'}),
+    ], style={'display': 'flex'}),
 ])
 
 ## Callback to update checkboxes based on DataFrame columns
