@@ -212,11 +212,14 @@ embedding_options=['pca', 'tsne']
 
 app.layout = html.Div([
     html.H1("MaNGA Galaxy Visualizer"),
-    dcc.Dropdown(
-        id="color-selector",
-        options=[{'label': col, 'value': col} for col in df.columns[2:]],
-        value=df.columns[2],  # Initial value
-    ),
+    html.Div([
+        html.Label("Highlighted Feature:"),
+        dcc.Dropdown(
+            id="color-selector",
+            options=[{'label': col, 'value': col} for col in df.columns[2:]],
+            value=df.columns[2],  # Initial value
+        ),
+    ], style={'width': '50%'}),
 
     html.Div([
         html.Div([
@@ -326,7 +329,7 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, s
     fig.update_layout(
         coloraxis_colorbar=dict(title=selected_color),
         height=800,
-        width=800,
+        #width=1000,
     )
 
     return fig, 0
