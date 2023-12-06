@@ -3,6 +3,7 @@ from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import plotly.express as px
 import pandas as pd
+import random
 #import numpy as np
 
 import webbrowser
@@ -69,8 +70,14 @@ def run_pca(df):
     return pca_df.reset_index(drop=True),col
 
 def run_tsne(df, perplexity=50, seed=42):
+    print("Running TSNE, perplexity: {}, seed: {}".format(perplexity, seed))
     col = ['tsne1', 'tsne2']
-    tsne_model = TSNE(n_components=2, perplexity=perplexity, random_state=seed)
+    tsne_model = None 
+    if seed < 0:
+        tsne_model = TSNE(n_components=2, perplexity=perplexity)
+    else:
+        tsne_model = TSNE(n_components=2, perplexity=perplexity, random_state=seed)
+
     tsne_df = pd.DataFrame(tsne_model.fit_transform(df), columns=col)
     return tsne_df.reset_index(drop=True),col
 
@@ -231,7 +238,16 @@ app.layout = html.Div([
                             options=[{'label': option, 'value': option} for option in embedding_options],
                             value=embedding_options[0]
                             ),
-                html.Div(id='embedding-param-container', children=[])
+                html.Div(id='embedding-param-container', children=[
+                            html.Div([
+                                html.Label("Perplexity:"),
+                                dcc.Input(id='perplexity-input', type='number', value=100),
+                            ]),
+                            html.Div([
+                                html.Label("Random Seed (-1 : Random):"),
+                                dcc.Input(id='seed-input', type='number', value=-1),
+                            ]),
+                        ], style={'display': 'none'})
             ], style={'width': '25%'}),
 
             html.Details([
@@ -265,47 +281,13 @@ app.layout = html.Div([
     ], style={'display': 'flex'}),
 ])
 
-# Callback to update additional inputs based on embedding choice
+# Callback to hide/show the embedding parameters based on choice 
 @app.callback(
-    Output('embedding-param-container', 'children'),
-    Input('embedding-selector', 'value')
+    Output('embedding-param-container', 'style'),
+    Input('embedding-selector', 'value'),
 )
-def update_additional_inputs(selected_option):
-    if selected_option == 'tsne':
-        # If tsne is selected, display additional parameters 
-        return [
-            html.Div([
-                html.Label("Perplexity:"),
-                dcc.Input(id='perplexity-input', type='number', value=100),
-            ]),
-            html.Div([
-                html.Label("Random Seed (-1 : Random):"),
-                dcc.Input(id='seed-input', type='number', value=-1),
-            ]),
-        ]
-    else:
-        # If no embedding parameters, display an empty container
-        return []
-
-## Callback to update checkboxes based on DataFrame columns
-#@app.callback(
-#    Output('checkbox-container', 'children'),
-#    Input('checkbox-container', 'id')
-#)
-#def update_checkboxes(_):
-#    print("update")
-#    checkboxes = []
-#
-#    # Add a checkbox for each column in the DataFrame
-#    for column in df.columns:
-#        checkbox = dcc.Checklist(
-#            id={'type': 'checkbox', 'index': column},
-#            options=[{'label': column, 'value': column}],
-#            value=[column] if column in df.columns else [],
-#        )
-#        checkboxes.append(checkbox)
-#
-#    return checkboxes
+def update_embedding_param_visibility(selected_option):
+    return {'display': 'none'} if selected_option != 'tsne' else {'display': 'block'}
 
 @app.callback(
     Output('scatterplot', 'figure'),
@@ -330,7 +312,7 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, s
             df = merge_df 
 
         elif embedding_choice == "tsne":
-            dim_red_df,PLOT_XY = run_tsne(scaled_df, perplexity=100, seed=100)
+            dim_red_df,PLOT_XY = run_tsne(scaled_df, perplexity=perplexity, seed=seed)
             merge_df = pd.concat([numeric_df, merge_df['MANGAID'], dim_red_df], axis=1, ignore_index=False)
             df = merge_df 
 
@@ -354,13 +336,11 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, s
     Input('scatterplot', 'clickData'),
 )
 def click_data_point(clickData):
-    print("Click!")
     if clickData is None:
         return {'editable': True}
     else:
         clicked_point_data = clickData['points'][0]
         
-        # Assuming 'URL' is a column in your DataFrame containing the URLs
         mangaID = df.loc[clicked_point_data['pointIndex'], 'MANGAID']
         url = "https://dr15.sdss.org/marvin/galaxy/" + mangaID.strip() + "/"
 
