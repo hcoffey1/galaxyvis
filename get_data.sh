@@ -20,3 +20,6 @@ wget https://data.sdss.org/sas/dr17/env/MANGA_AGN/v1_0_1/manga_agn-v1_0_1.fits
 
 #DAPALL
 wget https://data.sdss.org/sas/dr17/manga/spectro/analysis/v3_1_1/3.1.0/dapall-v3_1_1-3.1.0.fits
+
+#Firefly global data
+wget https://data.sdss.org/sas/dr17/manga/spectro/firefly/v3_1_1/manga-firefly-globalprop-v3_1_1-mastar.fits
