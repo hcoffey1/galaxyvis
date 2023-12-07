@@ -165,8 +165,9 @@ embedding_options=['pca', 'tsne']
 
 app.layout = html.Div([
     html.H1("MaNGA Galaxy Visualizer"),
+    html.P("Galaxy Count: {}".format(merge_df.shape[0])),
     html.Div([
-        html.Label("Highlighted Feature:"),
+        html.B("Highlighted Feature:"),
         dcc.Dropdown(
             id="color-selector",
             options=[{'label': col, 'value': col} for col in label_df.columns[2:]],
@@ -189,7 +190,7 @@ app.layout = html.Div([
             html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
 
             html.Div([
-                html.Label("Embedding Method"),
+                html.B("Embedding Method"),
                 dcc.Dropdown(id="embedding-selector", 
                             options=[{'label': option, 'value': option} for option in embedding_options],
                             value=embedding_options[0]
@@ -209,14 +210,16 @@ app.layout = html.Div([
             html.Details([
                 html.Summary('Show/Hide Boxes'),
                 html.Div([
-                    html.H3("Galaxy Zoo"),
-                    dcc.Checklist(
-                        id='galaxy-zoo-check-header',
-                        options=[
-                            {'label' : 'Check all', 'value': 'ticked'}
-                        ],
-                        value=['ticked']
-                    ),
+                    html.Div([
+                        html.B("Galaxy Zoo", style={'flex': '1'}),
+                        dcc.Checklist(
+                            id='galaxy-zoo-check-header',
+                            options=[
+                                {'label' : '', 'value': 'ticked'}
+                            ],
+                            value=['ticked']
+                        ),
+                    ], style={'display': 'flex', 'width' : 'max-content'}),
                     dcc.Checklist(
                         id='galaxy-zoo-checklist',
                         options=[
@@ -229,14 +232,16 @@ app.layout = html.Div([
                 ),
 
                 html.Div([
-                    html.H3("Firefly"),
-                    dcc.Checklist(
-                        id='firefly-check-header',
-                        options=[
-                            {'label' : 'Check all', 'value': 'ticked'}
-                        ],
-                        value=['ticked']
-                    ),
+                    html.Div([
+                        html.B("Firefly", style={'flex': '1'}),
+                        dcc.Checklist(
+                            id='firefly-check-header',
+                            options=[
+                                {'label' : '', 'value': 'ticked'}
+                            ],
+                            value=['ticked']
+                        ),
+                    ], style={'display': 'flex', 'width' :'max-content'}),
                     dcc.Checklist(
                         id='firefly-checklist',
                         options=[
