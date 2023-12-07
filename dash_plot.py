@@ -1,5 +1,7 @@
+#MaNGA Galaxy Visualizer
+#Hayden Coffey
+
 import dash
-from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import plotly.express as px
 import pandas as pd
@@ -12,6 +14,8 @@ from astropy.table import Table
 from sklearn.manifold import TSNE, Isomap
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MaxAbsScaler
+
+from layout import get_page_layout
 
 PLOT_XY = []
 
@@ -163,99 +167,7 @@ app = dash.Dash(__name__)
 
 embedding_options=['pca', 'tsne']
 
-app.layout = html.Div([
-    html.H1("MaNGA Galaxy Visualizer"),
-    html.P("Galaxy Count: {}".format(merge_df.shape[0])),
-    html.Div([
-        html.B("Highlighted Feature:"),
-        dcc.Dropdown(
-            id="color-selector",
-            options=[{'label': col, 'value': col} for col in label_df.columns[2:]],
-            value=df.columns[2],  # Initial value
-        ),
-    ], style={'width': '50%'}),
-
-    html.Div([
-        html.Div([
-            dcc.Loading(
-            id='loading-indicator',
-            type='circle',  # or 'default'
-            children=[
-                dcc.Graph(id='scatterplot'),
-                ]
-            ),
-        ], style={'flex': '1', 'width': '50%'}),
-
-        html.Div([
-            html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
-
-            html.Div([
-                html.B("Embedding Method"),
-                dcc.Dropdown(id="embedding-selector", 
-                            options=[{'label': option, 'value': option} for option in embedding_options],
-                            value=embedding_options[0]
-                            ),
-                html.Div(id='embedding-param-container', children=[
-                            html.Div([
-                                html.Label("Perplexity:"),
-                                dcc.Input(id='perplexity-input', type='number', value=100),
-                            ]),
-                            html.Div([
-                                html.Label("Random Seed (-1 : Random):"),
-                                dcc.Input(id='seed-input', type='number', value=-1),
-                            ]),
-                        ], style={'display': 'none'})
-            ], style={'width': '25%'}),
-
-            html.Details([
-                html.Summary('Show/Hide Boxes'),
-                html.Div([
-                    html.Div([
-                        html.B("Galaxy Zoo", style={'flex': '1'}),
-                        dcc.Checklist(
-                            id='galaxy-zoo-check-header',
-                            options=[
-                                {'label' : '', 'value': 'ticked'}
-                            ],
-                            value=['ticked']
-                        ),
-                    ], style={'display': 'flex', 'width' : 'max-content'}),
-                    dcc.Checklist(
-                        id='galaxy-zoo-checklist',
-                        options=[
-                            {'label': col, 'value': col}
-                            for col in label_df.columns if 'debiased' in col
-                        ],
-                        value=label_df.columns[label_df.columns.str.contains('debiased')].tolist(),
-                    )
-                ]
-                ),
-
-                html.Div([
-                    html.Div([
-                        html.B("Firefly", style={'flex': '1'}),
-                        dcc.Checklist(
-                            id='firefly-check-header',
-                            options=[
-                                {'label' : '', 'value': 'ticked'}
-                            ],
-                            value=['ticked']
-                        ),
-                    ], style={'display': 'flex', 'width' :'max-content'}),
-                    dcc.Checklist(
-                        id='firefly-checklist',
-                        options=[
-                            {'label': col, 'value': col}
-                            for col in firefly_str 
-                        ],
-                        value=firefly_str,
-                    )
-                ]
-                ),
-            ], style={'width': 'max-content'}),
-        ], style={'width': '50%'}),
-    ], style={'display': 'flex'}),
-])
+app.layout = get_page_layout(label_df, embedding_options, firefly_str)
 
 # Callback to handle header checkbox changes
 @app.callback(
