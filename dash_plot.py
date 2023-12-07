@@ -20,16 +20,9 @@ from layout import get_page_layout
 PLOT_XY = []
 
 # Define the path to your FITS file
-zoo_auto_file_path = "./data/MaNGA_GZD_auto-v1_0_1.fits"
 zoo_df17_file_path = "./data/MaNGA_gz-v2_0_1.fits"
-zoo_df15_file_path = "./data/MaNGA_gz-v1_0_1.fits"
-
 firefly_file_path= "./data/manga-firefly-globalprop-v3_1_1-mastar.fits"
-
 dap_all_file_path = "./data/dapall-v3_1_1-3.1.0.fits"
-
-agn_fits_path = './data/manga_agn-v1_0_1.fits'
-swift_fits_path="./data/SwiM_all_v4.fits"
 
 def read_fits(fits_path, hdu=1):
     dat = Table.read(fits_path, format='fits', hdu=hdu)
@@ -109,10 +102,7 @@ def run_isomap(df):
     return tsne_df.reset_index(drop=True),col
 
 #Read in fits files
-zoo_auto_df = read_fits(zoo_auto_file_path)
-zoo_df15_df = read_fits(zoo_df15_file_path)
 zoo_df17_df = read_fits(zoo_df17_file_path)
-swift_df = read_fits(swift_fits_path)
 
 dapall_df = read_fits(dap_all_file_path)
 dapall_df = dapall_df[dapall_df['DAPDONE'] == 1]
@@ -120,11 +110,6 @@ dapall_df = dapall_df[dapall_df['DAPDONE'] == 1]
 firefly_hdu_1_df = read_fits(firefly_file_path)
 firefly_hdu_2_df = read_fits(firefly_file_path,2)
 firefly_df = pd.concat([firefly_hdu_1_df, firefly_hdu_2_df], axis=1)
-
-agn_df = read_fits(agn_fits_path)
-prefix_to_remove = 'manga-'
-agn_df['MANGAID'] = agn_df['MANGAID'].str.replace(f'^{prefix_to_remove}', '', regex=True)
-
 
 #Merge dataframes
 merge_df = (zoo_df17_df.merge(firefly_df, left_on='MANGAID', right_on='MANGAID'))
@@ -249,7 +234,7 @@ def click_data_point(clickData):
         clicked_point_data = clickData['points'][0]
         
         mangaID = df.loc[clicked_point_data['pointIndex'], 'mangaid']
-        url = "https://dr15.sdss.org/marvin/galaxy/" + mangaID.strip() + "/"
+        url = "https://dr17.sdss.org/marvin/galaxy/" + mangaID.strip() + "/"
 
         # Check if a URL exists for the clicked point
         if url:
