@@ -204,7 +204,11 @@ dim_red_df,PLOT_XY = run_pca(scaled_df)
 merge_df = pd.concat([numeric_df, merge_df['MANGAID'], dim_red_df], axis=1, ignore_index=False)
 
 #df = pd.DataFrame(data)
-df = merge_df 
+df = merge_df
+
+excluded_labels = ['MANGAID', 'pc1', 'pc2', 'tsne1', 'tsne2', 'iso1', 'iso2']
+
+label_df = df.drop(excluded_labels, axis=1, errors='ignore')
 
 app = dash.Dash(__name__)
 
@@ -216,7 +220,7 @@ app.layout = html.Div([
         html.Label("Highlighted Feature:"),
         dcc.Dropdown(
             id="color-selector",
-            options=[{'label': col, 'value': col} for col in df.columns[2:]],
+            options=[{'label': col, 'value': col} for col in label_df.columns[2:]],
             value=df.columns[2],  # Initial value
         ),
     ], style={'width': '50%'}),
@@ -258,12 +262,19 @@ app.layout = html.Div([
                 html.Div([
                     html.H3("Galaxy Zoo"),
                     dcc.Checklist(
+                        id='galaxy-zoo-check-header',
+                        options=[
+                            {'label' : 'Check all', 'value': 'ticked'}
+                        ],
+                        value=['ticked']
+                    ),
+                    dcc.Checklist(
                         id='galaxy-zoo-checklist',
                         options=[
                             {'label': col, 'value': col}
-                            for col in df.columns if 'debiased' in col
+                            for col in label_df.columns if 'debiased' in col
                         ],
-                        value=df.columns[df.columns.str.contains('debiased')].tolist(),
+                        value=label_df.columns[label_df.columns.str.contains('debiased')].tolist(),
                     )
                 ]
                 ),
@@ -271,11 +282,19 @@ app.layout = html.Div([
                 html.Div([
                     html.H3("Other"),
                     dcc.Checklist(
+                        id='other-check-header',
+                        options=[
+                            {'label' : 'Check all', 'value': 'ticked'}
+                        ],
+                        value=['ticked']
+                    ),
+                    dcc.Checklist(
                         id='other-checklist',
                         options=[
                             {'label': col, 'value': col}
-                            for col in df.columns if not 'debiased' in col
+                            for col in label_df.columns if not 'debiased' in col
                         ],
+                        value=label_df.columns[~label_df.columns.str.contains('debiased')].tolist(),
                     )
                 ]
                 )
@@ -283,6 +302,23 @@ app.layout = html.Div([
         ], style={'width': '50%'}),
     ], style={'display': 'flex'}),
 ])
+
+# Callback to handle header checkbox changes
+@app.callback(
+    Output('galaxy-zoo-checklist', 'value'),
+    Output('other-checklist', 'value'),
+    Input('galaxy-zoo-check-header', 'value'),
+    Input('other-check-header', 'value'),
+    prevent_initial_call=True,
+)
+def update_checklists(galaxy_zoo_header, other_header):
+    # Check or uncheck all checkboxes based on header checkbox state
+    galaxy_zoo = label_df.columns[label_df.columns.str.contains('debiased')].tolist()
+    other = label_df.columns[~label_df.columns.str.contains('debiased')].tolist()
+
+    print(galaxy_zoo)
+
+    return galaxy_zoo if galaxy_zoo_header else [], other if other_header else []
 
 # Callback to hide/show the embedding parameters based on choice 
 @app.callback(
@@ -300,8 +336,10 @@ def update_embedding_param_visibility(selected_option):
     State('embedding-selector', 'value'),
     State('perplexity-input', 'value'),
     State('seed-input', 'value'),
+    State('galaxy-zoo-checklist', 'value'),
+    State('other-checklist', 'value'),
 )
-def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, seed):
+def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, seed, galaxy_zoo_list, other_list):
     global df
     global PLOT_XY 
     global scaled_df 
@@ -309,12 +347,18 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, s
     global merge_df 
 
     if n_clicks:
+        features = galaxy_zoo_list + other_list
+        print(features)
+
         if embedding_choice == "pca":
+            print(scaled_df)
+            scaled_df = scaler.fit_transform(numeric_df[features])
             dim_red_df,PLOT_XY = run_pca(scaled_df)
             merge_df = pd.concat([numeric_df, merge_df['MANGAID'], dim_red_df], axis=1, ignore_index=False)
             df = merge_df 
 
         elif embedding_choice == "tsne":
+            scaled_df = scaler.fit_transform(numeric_df[features])
             dim_red_df,PLOT_XY = run_tsne(scaled_df, perplexity=perplexity, seed=seed)
             merge_df = pd.concat([numeric_df, merge_df['MANGAID'], dim_red_df], axis=1, ignore_index=False)
             df = merge_df 
