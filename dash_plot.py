@@ -26,6 +26,9 @@ zoo_auto_file_path = "./data/MaNGA_GZD_auto-v1_0_1.fits"
 zoo_df17_file_path = "./data/MaNGA_gz-v2_0_1.fits"
 zoo_df15_file_path = "./data/MaNGA_gz-v1_0_1.fits"
 
+firefly_file_path= "./data/manga-firefly-globalprop-v3_1_1-mastar.fits"
+#firefly_file_path= "./data/manga-firefly-v3_1_1-mastar.fits"
+
 dap_all_file_path = "./data/dapall-v3_1_1-3.1.0.fits"
 
 #fits_file_path = "./data/MaNGA_gzUKIDSS-v1_0_1.fits"
@@ -33,20 +36,21 @@ agn_fits_path = './data/manga_agn-v1_0_1.fits'
 swift_fits_path="./data/SwiM_all_v4.fits"
 #swift_fits_path="./data/drpall-v3_1_1.fits"
 
-def read_fits(fits_path):
-    dat = Table.read(fits_path, format='fits')
+def read_fits(fits_path, hdu=1):
+    dat = Table.read(fits_path, format='fits', hdu=hdu)
     names = [name for name in dat.colnames if len(dat[name].shape) <= 1]
     df = dat[names].to_pandas()
-    df['MANGAID'] = df['MANGAID'].str.decode('utf-8')
-    df['MANGAID'] = df['MANGAID'].str.strip()
+    if 'MANGAID' in df:
+        df['MANGAID'] = df['MANGAID'].str.decode('utf-8')
+        df['MANGAID'] = df['MANGAID'].str.strip()
     return df
 
 def clean_df(df):
     #Remove outliers
-    #df = df[df['SFR_1RE'] >= -20] #May cause a crash
-    #df = df[df['SFR_1RE'] <= 20] #May cause a crash
-    #df = df[df['SFR_TOT'] >= -20] #May cause a crash
-    #df = df[df['SFR_TOT'] <= 20] #May cause a crash
+    df = df[df['SFR_1RE'] >= -20] #May cause a crash
+    df = df[df['SFR_1RE'] <= 20] #May cause a crash
+    df = df[df['SFR_TOT'] >= -20] #May cause a crash
+    df = df[df['SFR_TOT'] <= 20] #May cause a crash
     df = df[df['DAPQUAL'] == 0] #May cause a crash
     debiased_columns = [col for col in df.columns if "debiased" in col]
     for col in debiased_columns:
@@ -61,6 +65,7 @@ def get_numeric_df(df):
     #Remove non-numeric data
     non_numeric_columns = df.select_dtypes(include=['object']).columns
     df = df.drop(columns=non_numeric_columns)
+    df = df[~df[df < -9000].any(axis=1)] #filter out errors from firefly
     return df
 
 def run_pca(df):
@@ -94,6 +99,11 @@ swift_df = read_fits(swift_fits_path)
 agn_df = read_fits(agn_fits_path)
 dapall_df = read_fits(dap_all_file_path)
 
+firefly_hdu_1_df = read_fits(firefly_file_path)
+firefly_hdu_2_df = read_fits(firefly_file_path,2)
+
+firefly_df = pd.concat([firefly_hdu_1_df, firefly_hdu_2_df], axis=1)
+
 dapall_df = dapall_df[dapall_df['DAPDONE'] == 1]
 
 #dapall_df['HA_GSIGMA_1RE'] = np.log10(dapall_df['HA_GSIGMA_1RE'])
@@ -116,17 +126,14 @@ print("SWIFT-------------------")
 print(swift_df)
 print("DAPALL-------------------")
 print(dapall_df)
+print("Firefly-------------------")
+print(firefly_df)
+
 
 print('CONCAT------')
 zoo_concat = zoo_df17_df
 #zoo_concat = pd.concat([zoo_df15_df, zoo_df17_df])
 
-x = (zoo_concat['MANGAID'][10])
-print(x + "test")
-print("1-106630" + "test")
-print(zoo_concat[zoo_concat['MANGAID'] == x])
-
-print("DUPS: ", zoo_concat.duplicated(subset='MANGAID').sum())
 
 #merge_df = (zoo_auto_df.merge(zoo_df15_df, left_on='MANGAID', right_on='MANGAID'))
 
@@ -134,29 +141,28 @@ print("DUPS: ", zoo_concat.duplicated(subset='MANGAID').sum())
 
 #merge_df = zoo_concat 
 #merge_df = (zoo_concat.merge(swift_df, left_on='MANGAID', right_on='MANGAID'))
-merge_df = (zoo_concat.merge(dapall_df, left_on='MANGAID', right_on='MANGAID'))
+#merge_df = (zoo_concat.merge(dapall_df, left_on='MANGAID', right_on='MANGAID'))
+merge_df = (zoo_concat.merge(firefly_df, left_on='MANGAID', right_on='MANGAID'))
+merge_df = (merge_df.merge(dapall_df, left_on='MANGAID', right_on='MANGAID'))
 
-print("--------------------------------\n")
-print(zoo_concat['MANGAID'])
-print(dapall_df['MANGAID'])
+#print("--------------------------------\n")
+#print(zoo_concat['MANGAID'])
+#print(dapall_df['MANGAID'])
 
 print("MERGE-------------------")
 #Remove outliers
 merge_df = clean_df(merge_df)
 print(merge_df)
+#exit(1)
 
 #Remove non-numeric data
 numeric_df = get_numeric_df(merge_df)
 
-#print(merge_df['SFR_1RE'])
-
-for col in numeric_df.columns:
-    print(col)
-
+firefly_str = ["1re", "redshift"]
 
 #Select debiased columns
 debiased_columns = [col for col in numeric_df.columns if "debiased" in col \
-       or "1RE" in col]
+       or [s for s in firefly_str if s.lower() in col.lower()]]
         #+ ['OBJDEC_x', 'OBJRA_x'] 
         #+ ['SFR_1RE', 'HA_GSIGMA_1RE', 'STELLAR_SIGMA_1RE']
 #for c in (debiased_columns):
