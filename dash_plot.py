@@ -15,6 +15,8 @@ from sklearn.manifold import TSNE, Isomap
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MaxAbsScaler
 
+from sklearn.cluster import KMeans
+
 from layout import get_page_layout
 
 PLOT_XY = []
@@ -53,13 +55,15 @@ def clean_df(df):
 
     df.rename(columns={col: col.lower() for col in df.columns}, inplace=True)
 
+    rows_to_remove = df.map(lambda x: isinstance(x, (int, float)) and x < -9000).any(axis=1)
+    df = df[~rows_to_remove] #filter out errors from firefly
+
     return df
 
 def get_numeric_df(df):
     #Remove non-numeric data
     non_numeric_columns = df.select_dtypes(include=['object']).columns
     df = df.drop(columns=non_numeric_columns)
-    df = df[~df[df < -9000].any(axis=1)] #filter out errors from firefly
     return df
 
 def run_pca(df):
@@ -100,6 +104,15 @@ def run_isomap(df):
     tsne_model = Isomap(n_components=2)
     tsne_df = pd.DataFrame(tsne_model.fit_transform(df), columns=col)
     return tsne_df.reset_index(drop=True),col
+
+def run_kmeans(df, k, seed=42):
+    if seed < 0:
+        kmeans = KMeans(n_clusters=k, n_init=10)
+    else:
+        kmeans = KMeans(n_clusters=k, random_state=seed, n_init=10)
+
+    kmeans.fit(df)
+    return kmeans.labels_
 
 #Read in fits files
 zoo_df17_df = read_fits(zoo_df17_file_path)
@@ -142,6 +155,8 @@ dim_red_df,PLOT_XY = run_pca(scaled_df)
 
 merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
 
+merge_df['cluster'] = run_kmeans(dim_red_df, 3) 
+
 df = merge_df
 
 excluded_labels = ['mangaid', 'pc1', 'pc2', 'tsne1', 'tsne2', 'iso1', 'iso2']
@@ -151,8 +166,9 @@ label_df = df.drop(excluded_labels, axis=1, errors='ignore')
 app = dash.Dash(__name__)
 
 embedding_options=['pca', 'tsne']
+clustering_options=['kmeans']
 
-app.layout = get_page_layout(label_df, embedding_options, firefly_str)
+app.layout = get_page_layout(label_df, embedding_options, clustering_options, firefly_str)
 
 # Callback to handle header checkbox changes
 @app.callback(
@@ -177,17 +193,26 @@ def update_embedding_param_visibility(selected_option):
     return {'display': 'none'} if selected_option != 'tsne' else {'display': 'block'}
 
 @app.callback(
+    Output('clustering-param-container', 'style'),
+    Input('clustering-selector', 'value'),
+)
+def update_embedding_param_visibility(selected_option):
+    return {'display': 'none'} if selected_option != 'kmeans' else {'display': 'block'}
+
+@app.callback(
     Output('scatterplot', 'figure'),
     Output('regen-button', 'n_clicks'),
     Input('color-selector', 'value'),
     Input('regen-button', 'n_clicks'),
     State('embedding-selector', 'value'),
     State('perplexity-input', 'value'),
-    State('seed-input', 'value'),
+    State('tsne-seed-input', 'value'),
     State('galaxy-zoo-checklist', 'value'),
     State('firefly-checklist', 'value'),
+    State('k-input', 'value'),
+    State('k-seed-input', 'value'),
 )
-def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, seed, galaxy_zoo_list, firefly_list):
+def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, tsne_seed, galaxy_zoo_list, firefly_list, num_k, k_seed):
     global df
     global PLOT_XY 
     global scaled_df 
@@ -197,16 +222,19 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, s
     if n_clicks:
         features = galaxy_zoo_list + firefly_list
 
+        #TODO: If embedding stays the same and only clustering changes, don't run embedding again
         if embedding_choice == "pca":
             scaled_df = scaler.fit_transform(numeric_df[features])
             dim_red_df,PLOT_XY = run_pca(scaled_df)
             merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
+            merge_df['cluster'] = run_kmeans(dim_red_df, num_k, k_seed) 
             df = merge_df 
 
         elif embedding_choice == "tsne":
             scaled_df = scaler.fit_transform(numeric_df[features])
-            dim_red_df,PLOT_XY = run_tsne(scaled_df, perplexity=perplexity, seed=seed)
+            dim_red_df,PLOT_XY = run_tsne(scaled_df, perplexity=perplexity, seed=tsne_seed)
             merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
+            merge_df['cluster'] = run_kmeans(dim_red_df, num_k, k_seed) 
             df = merge_df 
 
     fig = px.scatter(

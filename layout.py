@@ -4,7 +4,7 @@
 from dash import dcc, html
 
 
-def get_page_layout(label_df, embedding_options, firefly_str):
+def get_page_layout(label_df, embedding_options, clustering_options, firefly_str):
 	highlight_feature_div = html.Div([
 			html.B("Highlighted Feature:"),
 			dcc.Dropdown(
@@ -37,7 +37,25 @@ def get_page_layout(label_df, embedding_options, firefly_str):
 				]),
 				html.Div([
 					html.Label("Random Seed (-1 : Random):"),
-					dcc.Input(id='seed-input', type='number', value=-1),
+					dcc.Input(id='tsne-seed-input', type='number', value=-1),
+				]),
+			], style={'display': 'none'})
+		], style={'width': '25%'})
+
+	clustering_method_div = html.Div([
+			html.B("Clustering Method"),
+			dcc.Dropdown(id="clustering-selector", 
+			options=[{'label': option, 'value': option} for option in clustering_options],
+			value=clustering_options[0]
+			),
+			html.Div(id='clustering-param-container', children=[
+				html.Div([
+					html.Label("k: "),
+					dcc.Input(id='k-input', type='number', value=3),
+				]),
+				html.Div([
+					html.Label("Random Seed (-1 : Random):"),
+					dcc.Input(id='k-seed-input', type='number', value=-1),
 				]),
 			], style={'display': 'none'})
 		], style={'width': '25%'})
@@ -96,9 +114,10 @@ def get_page_layout(label_df, embedding_options, firefly_str):
 			html.Div([
 				html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
 				embedding_method_div,
+				clustering_method_div,
 
 				html.Details([
-					html.Summary('Show/Hide Boxes'),
+					html.Summary('Input Features'),
 					galaxy_zoo_list_div,
 					firefly_list_div,
 				], style={'width': 'max-content'}),
