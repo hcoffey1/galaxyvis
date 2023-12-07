@@ -3,21 +3,15 @@ from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import plotly.express as px
 import pandas as pd
-import random
-#import numpy as np
+import time
 
 import webbrowser
 
-from astropy.io import fits
 from astropy.table import Table
 
 from sklearn.manifold import TSNE, Isomap
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler, MaxAbsScaler
-
-from scipy import stats
-
-import matplotlib.pyplot as plt
+from sklearn.preprocessing import MaxAbsScaler
 
 PLOT_XY = []
 
@@ -27,14 +21,11 @@ zoo_df17_file_path = "./data/MaNGA_gz-v2_0_1.fits"
 zoo_df15_file_path = "./data/MaNGA_gz-v1_0_1.fits"
 
 firefly_file_path= "./data/manga-firefly-globalprop-v3_1_1-mastar.fits"
-#firefly_file_path= "./data/manga-firefly-v3_1_1-mastar.fits"
 
 dap_all_file_path = "./data/dapall-v3_1_1-3.1.0.fits"
 
-#fits_file_path = "./data/MaNGA_gzUKIDSS-v1_0_1.fits"
 agn_fits_path = './data/manga_agn-v1_0_1.fits'
 swift_fits_path="./data/SwiM_all_v4.fits"
-#swift_fits_path="./data/drpall-v3_1_1.fits"
 
 def read_fits(fits_path, hdu=1):
     dat = Table.read(fits_path, format='fits', hdu=hdu)
@@ -47,18 +38,24 @@ def read_fits(fits_path, hdu=1):
 
 def clean_df(df):
     #Remove outliers
-    df = df[df['SFR_1RE'] >= -20] #May cause a crash
-    df = df[df['SFR_1RE'] <= 20] #May cause a crash
-    df = df[df['SFR_TOT'] >= -20] #May cause a crash
-    df = df[df['SFR_TOT'] <= 20] #May cause a crash
-    df = df[df['DAPQUAL'] == 0] #May cause a crash
+    if 'SFR_1RE' in df:
+        df = df[df['SFR_1RE'] >= -20]
+        df = df[df['SFR_1RE'] <= 20] 
+    if 'SFR_TOT' in df:
+        df = df[df['SFR_TOT'] >= -20]
+        df = df[df['SFR_TOT'] <= 20] 
+    if 'DAPQUAL' in df:
+        df = df[df['DAPQUAL'] == 0] 
+
     debiased_columns = [col for col in df.columns if "debiased" in col]
     for col in debiased_columns:
-        #df[col] = df[col].apply(lambda x: x if 0 <= x <= 1 else None) 
         df = df[df[col] >= 0] 
         df = df[df[col] <= 1] 
 
     df = df.dropna(axis=1)
+
+    df.rename(columns={col: col.lower() for col in df.columns}, inplace=True)
+
     return df
 
 def get_numeric_df(df):
@@ -69,13 +66,23 @@ def get_numeric_df(df):
     return df
 
 def run_pca(df):
+    print("Running PCA:")
+    start_time = time.time()
+
     col = ['pc1', 'pc2']
     pca = PCA(n_components=2)
-    pca_df = pd.DataFrame(pca.fit_transform(scaled_df), columns=col)
+    pca_df = pd.DataFrame(pca.fit_transform(df), columns=col)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time 
+    print("Time taken : {} s".format(elapsed_time))
+
     return pca_df.reset_index(drop=True),col
 
 def run_tsne(df, perplexity=50, seed=42):
     print("Running TSNE, perplexity: {}, seed: {}".format(perplexity, seed))
+    start_time = time.time()
+
     col = ['tsne1', 'tsne2']
     tsne_model = None 
     if seed < 0:
@@ -84,6 +91,11 @@ def run_tsne(df, perplexity=50, seed=42):
         tsne_model = TSNE(n_components=2, perplexity=perplexity, random_state=seed)
 
     tsne_df = pd.DataFrame(tsne_model.fit_transform(df), columns=col)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time 
+    print("Time taken : {} s".format(elapsed_time))
+
     return tsne_df.reset_index(drop=True),col
 
 def run_isomap(df):
@@ -92,111 +104,45 @@ def run_isomap(df):
     tsne_df = pd.DataFrame(tsne_model.fit_transform(df), columns=col)
     return tsne_df.reset_index(drop=True),col
 
+#Read in fits files
 zoo_auto_df = read_fits(zoo_auto_file_path)
 zoo_df15_df = read_fits(zoo_df15_file_path)
 zoo_df17_df = read_fits(zoo_df17_file_path)
 swift_df = read_fits(swift_fits_path)
-agn_df = read_fits(agn_fits_path)
+
 dapall_df = read_fits(dap_all_file_path)
+dapall_df = dapall_df[dapall_df['DAPDONE'] == 1]
 
 firefly_hdu_1_df = read_fits(firefly_file_path)
 firefly_hdu_2_df = read_fits(firefly_file_path,2)
-
 firefly_df = pd.concat([firefly_hdu_1_df, firefly_hdu_2_df], axis=1)
 
-dapall_df = dapall_df[dapall_df['DAPDONE'] == 1]
-
-#dapall_df['HA_GSIGMA_1RE'] = np.log10(dapall_df['HA_GSIGMA_1RE'])
-#print(dapall_df['HA_GSIGMA_1RE'])
-#exit(1)
-#dapall_df['STELLAR_SIGMA_1RE'] = np.log10(dapall_df['STELLAR_SIGMA_1RE'])
-
+agn_df = read_fits(agn_fits_path)
 prefix_to_remove = 'manga-'
 agn_df['MANGAID'] = agn_df['MANGAID'].str.replace(f'^{prefix_to_remove}', '', regex=True)
 
-#print("AUTO-------------------")
-#print(zoo_auto_df)
-print("DF15-------------------")
-print(zoo_df15_df)
-print("DF17-------------------")
-print(zoo_df17_df)
-print("AGN-------------------")
-print(agn_df)
-print("SWIFT-------------------")
-print(swift_df)
-print("DAPALL-------------------")
-print(dapall_df)
-print("Firefly-------------------")
-print(firefly_df)
 
-
-print('CONCAT------')
-zoo_concat = zoo_df17_df
-#zoo_concat = pd.concat([zoo_df15_df, zoo_df17_df])
-
-
-#merge_df = (zoo_auto_df.merge(zoo_df15_df, left_on='MANGAID', right_on='MANGAID'))
-
-#print(merge_df)
-
-#merge_df = zoo_concat 
-#merge_df = (zoo_concat.merge(swift_df, left_on='MANGAID', right_on='MANGAID'))
-#merge_df = (zoo_concat.merge(dapall_df, left_on='MANGAID', right_on='MANGAID'))
-merge_df = (zoo_concat.merge(firefly_df, left_on='MANGAID', right_on='MANGAID'))
+#Merge dataframes
+merge_df = (zoo_df17_df.merge(firefly_df, left_on='MANGAID', right_on='MANGAID'))
 merge_df = (merge_df.merge(dapall_df, left_on='MANGAID', right_on='MANGAID'))
 
-#print("--------------------------------\n")
-#print(zoo_concat['MANGAID'])
-#print(dapall_df['MANGAID'])
-
-print("MERGE-------------------")
 #Remove outliers
 merge_df = clean_df(merge_df)
-print(merge_df)
-#exit(1)
 
 #Remove non-numeric data
 numeric_df = get_numeric_df(merge_df)
 
-firefly_str = ["1re", "redshift"]
+#Select features of interest
+firefly_str = ["lw_age_1re", "mw_age_1re", "lw_z_1re", "mw_z_1re", "redshift", "photometric_mass"]
+debiased_columns = [
+    col for col in numeric_df.columns if "debiased" in col #Galaxy Zoo
+    or [s for s in firefly_str if s.lower() in col.lower() and "error" not in col.lower()] #Firefly
+    ]
 
-#Select debiased columns
-debiased_columns = [col for col in numeric_df.columns if "debiased" in col \
-       or [s for s in firefly_str if s.lower() in col.lower()]]
-        #+ ['OBJDEC_x', 'OBJRA_x'] 
-        #+ ['SFR_1RE', 'HA_GSIGMA_1RE', 'STELLAR_SIGMA_1RE']
-#for c in (debiased_columns):
-#    print(c)
-#exit(1)
 numeric_df = numeric_df[debiased_columns]
-
-#numeric_df = numeric_df[numeric_df['OBJDEC_x'] > 45]
-
-#bool_map = ((np.abs(stats.zscore(numeric_df)) < 3).all(axis=1))
-#neg_bool_map = [not elem for elem in bool_map]
-#numeric_df = numeric_df[bool_map]
-
-#numeric_df = numeric_df[(np.abs(stats.zscore(numeric_df)) < 3).all(axis=1)]
-
-#numeric_df = numeric_df[debiased_columns + ['SFR_1RE']]
-
-print("Numeric data----------")
-#numeric_df = numeric_df.sort_values(by=['SFR_1RE'], ascending=False)
-print(numeric_df)
-
-#numeric_df = numeric_df.reset_index()
-##print(numeric_df)
-#numeric_df.plot.scatter(x='index', y='SFR_1RE')
-##plt.plot(y=numeric_df['SFR_1RE'])
-#plt.show()
-#
-#numeric_df.plot.scatter(x='index', y='SFR_TOT')
-##plt.plot(y=numeric_df['SFR_1RE'])
-#plt.show()
 
 #Scale data before PCA
 scaler = MaxAbsScaler()
-#scaler = StandardScaler()
 scaled_df = scaler.fit_transform(numeric_df)
 
 #Merge PCA back into original data
@@ -204,15 +150,12 @@ merge_df = merge_df.reset_index(drop=True)
 numeric_df = numeric_df.reset_index(drop=True)
 
 dim_red_df,PLOT_XY = run_pca(scaled_df)
-#dim_red_df,PLOT_XY = run_tsne(scaled_df, perplexity=100, seed=100)
-#dim_red_df,PLOT_XY = run_isomap(scaled_df)
 
-merge_df = pd.concat([numeric_df, merge_df['MANGAID'], dim_red_df], axis=1, ignore_index=False)
+merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
 
-#df = pd.DataFrame(data)
 df = merge_df
 
-excluded_labels = ['MANGAID', 'pc1', 'pc2', 'tsne1', 'tsne2', 'iso1', 'iso2']
+excluded_labels = ['mangaid', 'pc1', 'pc2', 'tsne1', 'tsne2', 'iso1', 'iso2']
 
 label_df = df.drop(excluded_labels, axis=1, errors='ignore')
 
@@ -286,24 +229,24 @@ app.layout = html.Div([
                 ),
 
                 html.Div([
-                    html.H3("Other"),
+                    html.H3("Firefly"),
                     dcc.Checklist(
-                        id='other-check-header',
+                        id='firefly-check-header',
                         options=[
                             {'label' : 'Check all', 'value': 'ticked'}
                         ],
                         value=['ticked']
                     ),
                     dcc.Checklist(
-                        id='other-checklist',
+                        id='firefly-checklist',
                         options=[
                             {'label': col, 'value': col}
-                            for col in label_df.columns if not 'debiased' in col
+                            for col in firefly_str 
                         ],
-                        value=label_df.columns[~label_df.columns.str.contains('debiased')].tolist(),
+                        value=firefly_str,
                     )
                 ]
-                )
+                ),
             ], style={'width': 'max-content'}),
         ], style={'width': '50%'}),
     ], style={'display': 'flex'}),
@@ -312,19 +255,16 @@ app.layout = html.Div([
 # Callback to handle header checkbox changes
 @app.callback(
     Output('galaxy-zoo-checklist', 'value'),
-    Output('other-checklist', 'value'),
+    Output('firefly-checklist', 'value'),
     Input('galaxy-zoo-check-header', 'value'),
-    Input('other-check-header', 'value'),
+    Input('firefly-check-header', 'value'),
     prevent_initial_call=True,
 )
-def update_checklists(galaxy_zoo_header, other_header):
+def update_checklists(galaxy_zoo_header, firefly_header):
     # Check or uncheck all checkboxes based on header checkbox state
     galaxy_zoo = label_df.columns[label_df.columns.str.contains('debiased')].tolist()
-    other = label_df.columns[~label_df.columns.str.contains('debiased')].tolist()
 
-    print(galaxy_zoo)
-
-    return galaxy_zoo if galaxy_zoo_header else [], other if other_header else []
+    return galaxy_zoo if galaxy_zoo_header else [], firefly_str if firefly_header else []
 
 # Callback to hide/show the embedding parameters based on choice 
 @app.callback(
@@ -343,9 +283,9 @@ def update_embedding_param_visibility(selected_option):
     State('perplexity-input', 'value'),
     State('seed-input', 'value'),
     State('galaxy-zoo-checklist', 'value'),
-    State('other-checklist', 'value'),
+    State('firefly-checklist', 'value'),
 )
-def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, seed, galaxy_zoo_list, other_list):
+def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, seed, galaxy_zoo_list, firefly_list):
     global df
     global PLOT_XY 
     global scaled_df 
@@ -353,33 +293,30 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, s
     global merge_df 
 
     if n_clicks:
-        features = galaxy_zoo_list + other_list
-        print(features)
+        features = galaxy_zoo_list + firefly_list
 
         if embedding_choice == "pca":
-            print(scaled_df)
             scaled_df = scaler.fit_transform(numeric_df[features])
             dim_red_df,PLOT_XY = run_pca(scaled_df)
-            merge_df = pd.concat([numeric_df, merge_df['MANGAID'], dim_red_df], axis=1, ignore_index=False)
+            merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
             df = merge_df 
 
         elif embedding_choice == "tsne":
             scaled_df = scaler.fit_transform(numeric_df[features])
             dim_red_df,PLOT_XY = run_tsne(scaled_df, perplexity=perplexity, seed=seed)
-            merge_df = pd.concat([numeric_df, merge_df['MANGAID'], dim_red_df], axis=1, ignore_index=False)
+            merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
             df = merge_df 
 
     fig = px.scatter(
         df, x=PLOT_XY[0], y=PLOT_XY[1], color=selected_color, color_continuous_scale='Viridis',
         labels={selected_color: selected_color},
-        hover_name="MANGAID",
+        hover_name="mangaid",
         title='Interactive Scatterplot with Color Selector',
     )
 
     fig.update_layout(
         coloraxis_colorbar=dict(title=selected_color),
         height=800,
-        #width=1000,
     )
 
     return fig, 0
@@ -394,7 +331,7 @@ def click_data_point(clickData):
     else:
         clicked_point_data = clickData['points'][0]
         
-        mangaID = df.loc[clicked_point_data['pointIndex'], 'MANGAID']
+        mangaID = df.loc[clicked_point_data['pointIndex'], 'mangaid']
         url = "https://dr15.sdss.org/marvin/galaxy/" + mangaID.strip() + "/"
 
         # Check if a URL exists for the clicked point
