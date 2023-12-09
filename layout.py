@@ -20,12 +20,10 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
 			type='circle',  # or 'default'
 			children=[
 				dcc.Graph(id='scatterplot'),
-				dcc.Graph(id='clusterscatter'),
-				dcc.Graph(id='barplot'),
 				]
 			),
 		], style={'flex': '1', 'width': '50%'})
-
+	
 	embedding_method_div = html.Div([
 			html.B("Embedding Method"),
 			dcc.Dropdown(id="embedding-selector", 
@@ -61,6 +59,18 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
 				]),
 			], style={'display': 'none'})
 		], style={'width': '25%'})
+	
+	clustering_div = html.Div([
+		clustering_method_div,
+		dcc.Loading(
+			id='loading-indicator',
+			type='circle',  # or 'default'
+			children=[
+				dcc.Graph(id='clusterscatter'),
+				dcc.Graph(id='barplot'),
+				]
+			),
+	], style={'width': '50%'})
 
 	galaxy_zoo_list_div = html.Div([
 			html.Div([
@@ -116,7 +126,6 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
 			html.Div([
 				html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
 				embedding_method_div,
-				clustering_method_div,
 
 				html.Details([
 					html.Summary('Input Features'),
@@ -125,4 +134,5 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
 				], style={'width': 'max-content'}),
 			], style={'width': '50%'}),
 		], style={'display': 'flex'}),
+		clustering_div,
 	])

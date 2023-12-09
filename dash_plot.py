@@ -264,7 +264,11 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, t
     clusterscatterfig.update_layout(
         height=400,
         width=400,
+        margin=dict(l=0)
     )
+    clusterscatterfig.update_xaxes(showticklabels=False, title_text='')
+    clusterscatterfig.update_yaxes(showticklabels=False, title_text='')
+
     cluster_perc = pd.DataFrame(df['cluster'].value_counts(normalize=True)*100).reset_index()
     cluster_perc['group'] = ''
     cluster_perc['cluster'] = cluster_perc['cluster']
