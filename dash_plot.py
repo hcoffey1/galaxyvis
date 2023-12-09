@@ -201,6 +201,7 @@ def update_embedding_param_visibility(selected_option):
 
 @app.callback(
     Output('scatterplot', 'figure'),
+    Output('clusterscatter', 'figure'),
     Output('barplot', 'figure'),
     Output('regen-button', 'n_clicks'),
     Input('color-selector', 'value'),
@@ -248,7 +249,22 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, t
     if selected_color == 'cluster':
         fig.update_coloraxes(showscale=False)
 
+    fig.update_layout(
+        coloraxis_colorbar=dict(title=selected_color),
+        height=800,
+    )
 
+    clusterscatterfig = px.scatter(
+        df, x=PLOT_XY[0], y=PLOT_XY[1], color='cluster', color_continuous_scale='Viridis',
+        labels={'cluster': 'cluster'},
+        hover_name="mangaid",
+        title='Clusters in Embedding Space',
+    )
+    clusterscatterfig.update_coloraxes(showscale=False)
+    clusterscatterfig.update_layout(
+        height=400,
+        width=400,
+    )
     cluster_perc = pd.DataFrame(df['cluster'].value_counts(normalize=True)*100).reset_index()
     cluster_perc['group'] = ''
     cluster_perc['cluster'] = cluster_perc['cluster']
@@ -264,15 +280,10 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, t
             color_continuous_scale='Viridis',
         ).update_xaxes(range=[0, 100])  # Set y-axis range from 0 to 100%
 
-    fig.update_layout(
-        coloraxis_colorbar=dict(title=selected_color),
-        height=800,
-    )
-
     #TODO: Move clustering method down to here and create separate layout section for cluster analysis?
     #Stacked proportion bar chart
     barfig.update_traces(
-        hovertemplate="<b>proportion:</b> %{customdata[0]:.2f}<br><b>cluster:</b> %{customdata[1]}<extra></extra>"
+        hovertemplate="<b>cluster:</b> %{customdata[1]}<extra></extra><br><b>%{customdata[0]:.2f}%</b>"
     )
     barfig.update_layout(
         coloraxis_colorbar=dict(title=selected_color),
@@ -285,13 +296,32 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, t
     barfig.update_yaxes(title_text='')
 
 
-    return fig, barfig, 0
+    return fig, clusterscatterfig, barfig, 0
 
 @app.callback(
     Output('scatterplot', 'config'),
     Input('scatterplot', 'clickData'),
 )
 def click_data_point(clickData):
+    if clickData is None:
+        return {'editable': True}
+    else:
+        clicked_point_data = clickData['points'][0]
+        
+        mangaID = df.loc[clicked_point_data['pointIndex'], 'mangaid']
+        url = "https://dr17.sdss.org/marvin/galaxy/" + mangaID.strip() + "/"
+
+        # Check if a URL exists for the clicked point
+        if url:
+            webbrowser.open_new_tab(url)  # Open the URL in a new tab
+
+        return {'editable': True}
+
+@app.callback(
+    Output('clusterscatter', 'config'),
+    Input('clusterscatter', 'clickData'),
+)
+def cluster_click_data_point(clickData):
     if clickData is None:
         return {'editable': True}
     else:

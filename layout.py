@@ -20,6 +20,7 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
 			type='circle',  # or 'default'
 			children=[
 				dcc.Graph(id='scatterplot'),
+				dcc.Graph(id='clusterscatter'),
 				dcc.Graph(id='barplot'),
 				]
 			),
