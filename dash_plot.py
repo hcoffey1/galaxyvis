@@ -16,7 +16,7 @@ from sklearn.manifold import TSNE, Isomap
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MaxAbsScaler
 
-from sklearn.cluster import KMeans, MeanShift
+from sklearn.cluster import KMeans, MeanShift, HDBSCAN, AgglomerativeClustering
 
 from layout import get_page_layout, get_scatter_fig, get_cluster_scatter_fig, \
     get_cluster_line_fig, get_cluster_bar_fig
@@ -145,12 +145,22 @@ def run_kmeans(df, k, seed=42):
 def run_meanshift(df):
     return MeanShift().fit(df).labels_.astype(str)
 
+def run_hdbscan(df):
+    return HDBSCAN(min_cluster_size=20).fit(df).labels_.astype(str)
+
+def run_agglomerative(df):
+    return AgglomerativeClustering(n_clusters=3).fit(df).labels_.astype(str)
+
 def run_clustering(df, algo_name, num_k, k_seed):
     clusters = None
     if algo_name == 'kmeans':
         clusters = run_kmeans(df, num_k, k_seed) 
     elif algo_name == 'meanshift':
         clusters = run_meanshift(df)
+    elif algo_name == 'hdbscan':
+        clusters = run_hdbscan(df)
+    elif algo_name == 'agglomerative':
+        clusters = run_agglomerative(df)
 
     return clusters
 
@@ -212,7 +222,7 @@ label_df = df.drop(excluded_labels, axis=1, errors='ignore')
 app = dash.Dash(__name__)
 
 embedding_options=['pca', 'tsne']
-clustering_options=['kmeans', 'meanshift']
+clustering_options=['kmeans', 'meanshift', 'hdbscan', 'agglomerative']
 
 app.layout = get_page_layout(label_df, embedding_options, clustering_options, firefly_str)
 
