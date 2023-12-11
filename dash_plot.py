@@ -3,6 +3,7 @@
 
 import dash
 from dash.dependencies import Input, Output, State
+from dash import ctx
 import plotly.express as px
 import pandas as pd
 import time
@@ -15,7 +16,7 @@ from sklearn.manifold import TSNE, Isomap
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MaxAbsScaler
 
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, MeanShift
 
 from layout import get_page_layout
 
@@ -26,6 +27,8 @@ zoo_df17_file_path = "./data/MaNGA_gz-v2_0_1.fits"
 firefly_file_path= "./data/manga-firefly-globalprop-v3_1_1-mastar.fits"
 dap_all_file_path = "./data/dapall-v3_1_1-3.1.0.fits"
 morph_fits = "./data/manga_visual_morpho-2.0.1.fits"
+
+dim_red_df = None
 
 def read_fits(fits_path, hdu=1):
     dat = Table.read(fits_path, format='fits', hdu=hdu)
@@ -44,8 +47,14 @@ def clean_df(df):
     if 'SFR_TOT' in df:
         df = df[df['SFR_TOT'] >= -20]
         df = df[df['SFR_TOT'] <= 20] 
+
+    #DAP ALL
     if 'DAPQUAL' in df:
         df = df[df['DAPQUAL'] == 0] 
+
+    #Galaxy Morphology
+    #if 'Unsure' in df:
+        #df = df[df['Unsure'] == 0] 
 
     debiased_columns = [col for col in df.columns if "debiased" in col]
     for col in debiased_columns:
@@ -67,6 +76,7 @@ def get_numeric_df(df):
     df = df.drop(columns=non_numeric_columns)
     return df
 
+#Embedding algorithms
 def run_pca(df):
     print("Running PCA:")
     start_time = time.time()
@@ -106,6 +116,7 @@ def run_isomap(df):
     tsne_df = pd.DataFrame(tsne_model.fit_transform(df), columns=col)
     return tsne_df.reset_index(drop=True),col
 
+#Clustering algorithms
 def run_kmeans(df, k, seed=42):
     if seed < 0:
         kmeans = KMeans(n_clusters=k, n_init=10)
@@ -114,6 +125,18 @@ def run_kmeans(df, k, seed=42):
 
     kmeans.fit(df)
     return kmeans.labels_.astype(str)
+
+def run_meanshift(df):
+    return MeanShift().fit(df).labels_.astype(str)
+
+def run_clustering(df, algo_name, num_k, k_seed):
+    clusters = None
+    if algo_name == 'kmeans':
+        clusters = run_kmeans(df, num_k, k_seed) 
+    elif algo_name == 'meanshift':
+        clusters = run_meanshift(df)
+
+    return clusters
 
 #Read in fits files
 zoo_df17_df = read_fits(zoo_df17_file_path)
@@ -140,10 +163,12 @@ merge_df = clean_df(merge_df)
 numeric_df = get_numeric_df(merge_df)
 
 #Select features of interest
-firefly_str = ["lw_age_1re", "mw_age_1re", "lw_z_1re", "mw_z_1re", "redshift", "photometric_mass", 'ttype']
+firefly_str = ["lw_age_1re", "mw_age_1re", "lw_z_1re", "mw_z_1re", "redshift", "photometric_mass"]
+meta_str = ["ttype", "unsure"]
 debiased_columns = [
     col for col in numeric_df.columns if "debiased" in col #Galaxy Zoo
     or [s for s in firefly_str if s.lower() in col.lower() and "error" not in col.lower()] #Firefly
+    or [s for s in meta_str if s.lower() in col.lower() and "error" not in col.lower()] #Meta data
     ]
 
 numeric_df = numeric_df[debiased_columns]
@@ -171,7 +196,7 @@ label_df = df.drop(excluded_labels, axis=1, errors='ignore')
 app = dash.Dash(__name__)
 
 embedding_options=['pca', 'tsne']
-clustering_options=['kmeans']
+clustering_options=['kmeans', 'meanshift']
 
 app.layout = get_page_layout(label_df, embedding_options, clustering_options, firefly_str)
 
@@ -210,40 +235,51 @@ def update_embedding_param_visibility(selected_option):
     Output('barplot', 'figure'),
     Output('clusterline', 'figure'),
     Output('regen-button', 'n_clicks'),
+    Output('regen-cluster-button', 'n_clicks'),
+
     Input('color-selector', 'value'),
     Input('regen-button', 'n_clicks'),
+    Input('regen-cluster-button', 'n_clicks'),
+
     State('embedding-selector', 'value'),
     State('perplexity-input', 'value'),
     State('tsne-seed-input', 'value'),
     State('galaxy-zoo-checklist', 'value'),
     State('firefly-checklist', 'value'),
+    State('clustering-selector', 'value'),
     State('k-input', 'value'),
     State('k-seed-input', 'value'),
 )
-def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, tsne_seed, galaxy_zoo_list, firefly_list, num_k, k_seed):
+def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
+                        embedding_choice, perplexity, tsne_seed, galaxy_zoo_list,
+                        firefly_list, clustering_choice, num_k, k_seed):
     global df
     global PLOT_XY 
     global scaled_df 
     global numeric_df 
     global merge_df 
+    global dim_red_df
 
-    if n_clicks:
+    if ctx.triggered_id == "regen-button" and embedding_n_clicks:
         features = galaxy_zoo_list + firefly_list
 
-        #TODO: If embedding stays the same and only clustering changes, don't run embedding again
         if embedding_choice == "pca":
             scaled_df = scaler.fit_transform(numeric_df[features])
             dim_red_df,PLOT_XY = run_pca(scaled_df)
             merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
-            merge_df['cluster'] = run_kmeans(dim_red_df, num_k, k_seed) 
+            merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
             df = merge_df 
 
         elif embedding_choice == "tsne":
             scaled_df = scaler.fit_transform(numeric_df[features])
             dim_red_df,PLOT_XY = run_tsne(scaled_df, perplexity=perplexity, seed=tsne_seed)
             merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
-            merge_df['cluster'] = run_kmeans(dim_red_df, num_k, k_seed) 
+            merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
             df = merge_df 
+
+    elif ctx.triggered_id == "regen-cluster-button" and cluster_n_clicks:
+        merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
+        df = merge_df
 
     df = df.sort_values(by='cluster', ascending=True)
 
@@ -333,7 +369,7 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, t
     barfig.update_yaxes(title_text='')
 
 
-    return fig, clusterscatterfig, barfig, cluster_line_fig, 0
+    return fig, clusterscatterfig, barfig, cluster_line_fig, 0, 0
 
 @app.callback(
     Output('scatterplot', 'config'),

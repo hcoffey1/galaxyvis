@@ -137,5 +137,6 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
 				], style={'width': 'max-content'}),
 			], style={'width': '50%'}),
 		], style={'display': 'flex'}),
+		html.Button('Calculate Clusters', id='regen-cluster-button', n_clicks=0),
 		clustering_div,
 	])
