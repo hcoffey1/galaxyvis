@@ -251,4 +251,8 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
 		], style={'display': 'flex'}),
 		html.Button('Calculate Clusters', id='regen-cluster-button', n_clicks=0),
 		clustering_div,
+        html.Div([
+			html.Button('Export Cluster Data', id='export-cluster-button', n_clicks=0, style={'width' : 'max-content'}),
+			html.Div(id='output-message', style={'flex' : '1'}),
+		], style={'display':'flex'}),
 	])

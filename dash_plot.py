@@ -8,6 +8,9 @@ import plotly.express as px
 import pandas as pd
 import time
 
+from datetime import datetime
+import os
+
 import webbrowser
 
 from astropy.table import Table
@@ -22,6 +25,9 @@ from layout import get_page_layout, get_scatter_fig, get_cluster_scatter_fig, \
     get_cluster_line_fig, get_cluster_bar_fig
 
 PLOT_XY = []
+
+CURRENT_EMBEDDING = None
+CURRENT_CLUSTERING = None
 
 # Define the path to your FITS file
 zoo_df17_file_path = "./data/MaNGA_gz-v2_0_1.fits"
@@ -164,6 +170,10 @@ def run_clustering(df, algo_name, num_k, k_seed):
 
     return clusters
 
+def create_directory(directory_path):
+    if not os.path.exists(directory_path):
+        os.makedirs(directory_path)
+
 #Read in fits files
 zoo_df17_df = read_fits(zoo_df17_file_path)
 
@@ -208,10 +218,12 @@ merge_df = merge_df.reset_index(drop=True)
 numeric_df = numeric_df.reset_index(drop=True)
 
 dim_red_df,PLOT_XY = run_pca(scaled_df)
+CURRENT_EMBEDDING = 'pca' 
 
 merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
 
 merge_df['cluster'] = run_agglomerative(dim_red_df) 
+CURRENT_CLUSTERING = 'agglomerative' 
 
 df = merge_df
 
@@ -285,16 +297,22 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
     global numeric_df 
     global merge_df 
     global dim_red_df
+    global CURRENT_EMBEDDING
+    global CURRENT_CLUSTERING 
 
     if ctx.triggered_id == "regen-button" and embedding_n_clicks:
         features = galaxy_zoo_list + firefly_list
         dim_red_df,PLOT_XY = run_embedding(numeric_df, features, embedding_choice, perplexity, tsne_seed)
+        CURRENT_EMBEDDING = embedding_choice
+
         merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
         merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
+        CURRENT_CLUSTERING = clustering_choice 
         df = merge_df 
 
     elif ctx.triggered_id == "regen-cluster-button" and cluster_n_clicks:
         merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
+        CURRENT_CLUSTERING = clustering_choice 
         df = merge_df
 
     df = df.sort_values(by='cluster', ascending=True)
@@ -344,6 +362,30 @@ def cluster_click_data_point(clickData):
 
         return {'editable': True}
 
+# Callback to export cluster data as csv
+@app.callback(
+    Output('output-message', 'children'),
+    Output('export-cluster-button', 'n_clicks'),
+    Input('export-cluster-button', 'n_clicks'),
+    prevent_initial_call=True,
+)
+def update_message(n_clicks):
+    global merge_df
+
+    if n_clicks is None:
+        return '',0  # Initial state, no message
+    else:
+        timestamp = datetime.now()
+        formatted_timestamp = timestamp.strftime("%Y-%m-%d-%H:%M:%S")
+        outputfile = f'{CURRENT_EMBEDDING}_{CURRENT_CLUSTERING}_{formatted_timestamp}.csv'
+
+        output_dir = './clusters/'
+
+        create_directory(output_dir)
+
+        output_df = merge_df[['mangaid', 'cluster']]
+        output_df.to_csv(output_dir + outputfile)
+        return f'Exported to {output_dir + outputfile}',0
 
 if __name__ == '__main__':
     app.run_server(debug=True)
