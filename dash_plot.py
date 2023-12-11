@@ -211,7 +211,7 @@ dim_red_df,PLOT_XY = run_pca(scaled_df)
 
 merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
 
-merge_df['cluster'] = run_kmeans(dim_red_df, 3) 
+merge_df['cluster'] = run_agglomerative(dim_red_df) 
 
 df = merge_df
 
@@ -222,7 +222,7 @@ label_df = df.drop(excluded_labels, axis=1, errors='ignore')
 app = dash.Dash(__name__)
 
 embedding_options=['pca', 'tsne']
-clustering_options=['kmeans', 'meanshift', 'hdbscan', 'agglomerative']
+clustering_options=['agglomerative', 'hdbscan', 'kmeans', 'meanshift']
 
 app.layout = get_page_layout(label_df, embedding_options, clustering_options, firefly_str)
 
