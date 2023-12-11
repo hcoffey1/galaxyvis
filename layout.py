@@ -3,7 +3,10 @@
 
 from dash import dcc, html
 import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
+
+TITLE = "Galaxy Vis"
 
 def get_scatter_fig(df, selected_color, PLOT_XY):
 	fig = px.scatter(
@@ -46,25 +49,36 @@ def get_cluster_line_fig(df):
 
     # Calculate the total count for each cluster
     cluster_totals = grouped.groupby('cluster')['count'].sum()
+    ttype_totals = (pd.DataFrame( grouped.groupby('ttype')['count'].sum()).reset_index())
 
     # Merge the grouped data with the total counts
     result = pd.merge(grouped, cluster_totals, on='cluster', suffixes=('_class', '_total'))
 
     # Calculate the percentage for each classification within each cluster
     result['percentage'] = (result['count_class'] / result['count_total']) * 100
+    
+    # Create traces for each cluster
+    traces = []
+    for cluster in result['cluster'].unique():
+        cluster_data = result[result['cluster'] == cluster]
+        trace = go.Scatter(x=cluster_data['ttype'], y=cluster_data['count_class'],
+                        mode='lines+markers', name=f'Cluster {cluster}')
+        traces.append(trace)
 
-    #TODO: Try out other clustering algorithms
-    cluster_line_fig = px.line(
-        result,
-        y='count_class',
-        x='ttype',
-        color='cluster'
-    )
-	
-    cluster_line_fig.update_yaxes(title_text='Galaxy Count')
-    cluster_line_fig.update_xaxes(title_text='T-Type')
+    # Add a trace for the 'Total'
+    total_trace = go.Scatter(x=ttype_totals['ttype'], y=ttype_totals['count'],
+                            mode='lines+markers', name='Total', line=dict(dash='dash'))
+    traces.append(total_trace)
 
-    return cluster_line_fig
+    # Create the layout
+    layout = go.Layout(
+                    xaxis=dict(title='T-Type'),
+                    yaxis=dict(title='Galaxy Count'))
+
+    # Create the figure
+    fig = go.Figure(data=traces, layout=layout)
+
+    return fig
 
 def get_cluster_bar_fig(df):
     cluster_perc = pd.DataFrame(df['cluster'].value_counts(normalize=True)*100).reset_index()
@@ -216,7 +230,7 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
 		])
 
 	return html.Div([
-		html.H1("MaNGA Galaxy Visualizer"),
+		html.H1(TITLE),
 		html.P("Galaxy Count: {}".format(label_df.shape[0])),
 
 		highlight_feature_div,
