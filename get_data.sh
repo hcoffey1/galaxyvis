@@ -23,3 +23,6 @@ wget https://data.sdss.org/sas/dr17/manga/spectro/analysis/v3_1_1/3.1.0/dapall-v
 
 #Firefly global data
 wget https://data.sdss.org/sas/dr17/manga/spectro/firefly/v3_1_1/manga-firefly-globalprop-v3_1_1-mastar.fits
+
+#Galaxy Morphologies
+wget https://data.sdss.org/sas/dr17/env/MANGA_MORPHOLOGY/manga_visual_morpho/2.0.1/manga_visual_morpho-2.0.1.fits

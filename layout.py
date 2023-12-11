@@ -63,10 +63,13 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
 	clustering_div = html.Div([
 		clustering_method_div,
 		dcc.Loading(
-			id='loading-indicator',
+			id='loading-indicator-embeddings',
 			type='circle',  # or 'default'
 			children=[
-				dcc.Graph(id='clusterscatter'),
+				html.Div([
+				dcc.Graph(id='clusterscatter', style={'flex': '1'}),
+				dcc.Graph(id='clusterline'),
+				], style={'display': 'flex'}),
 				dcc.Graph(id='barplot'),
 				]
 			),

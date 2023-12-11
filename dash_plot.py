@@ -25,6 +25,7 @@ PLOT_XY = []
 zoo_df17_file_path = "./data/MaNGA_gz-v2_0_1.fits"
 firefly_file_path= "./data/manga-firefly-globalprop-v3_1_1-mastar.fits"
 dap_all_file_path = "./data/dapall-v3_1_1-3.1.0.fits"
+morph_fits = "./data/manga_visual_morpho-2.0.1.fits"
 
 def read_fits(fits_path, hdu=1):
     dat = Table.read(fits_path, format='fits', hdu=hdu)
@@ -112,7 +113,7 @@ def run_kmeans(df, k, seed=42):
         kmeans = KMeans(n_clusters=k, random_state=seed, n_init=10)
 
     kmeans.fit(df)
-    return kmeans.labels_
+    return kmeans.labels_.astype(str)
 
 #Read in fits files
 zoo_df17_df = read_fits(zoo_df17_file_path)
@@ -124,9 +125,13 @@ firefly_hdu_1_df = read_fits(firefly_file_path)
 firefly_hdu_2_df = read_fits(firefly_file_path,2)
 firefly_df = pd.concat([firefly_hdu_1_df, firefly_hdu_2_df], axis=1)
 
+morph_df = read_fits(morph_fits)
+
 #Merge dataframes
 merge_df = (zoo_df17_df.merge(firefly_df, left_on='MANGAID', right_on='MANGAID'))
 merge_df = (merge_df.merge(dapall_df, left_on='MANGAID', right_on='MANGAID'))
+merge_df = (merge_df.merge(morph_df, left_on='MANGAID', right_on='MANGAID'))
+
 
 #Remove outliers
 merge_df = clean_df(merge_df)
@@ -135,7 +140,7 @@ merge_df = clean_df(merge_df)
 numeric_df = get_numeric_df(merge_df)
 
 #Select features of interest
-firefly_str = ["lw_age_1re", "mw_age_1re", "lw_z_1re", "mw_z_1re", "redshift", "photometric_mass"]
+firefly_str = ["lw_age_1re", "mw_age_1re", "lw_z_1re", "mw_z_1re", "redshift", "photometric_mass", 'ttype']
 debiased_columns = [
     col for col in numeric_df.columns if "debiased" in col #Galaxy Zoo
     or [s for s in firefly_str if s.lower() in col.lower() and "error" not in col.lower()] #Firefly
@@ -203,6 +208,7 @@ def update_embedding_param_visibility(selected_option):
     Output('scatterplot', 'figure'),
     Output('clusterscatter', 'figure'),
     Output('barplot', 'figure'),
+    Output('clusterline', 'figure'),
     Output('regen-button', 'n_clicks'),
     Input('color-selector', 'value'),
     Input('regen-button', 'n_clicks'),
@@ -239,6 +245,8 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, t
             merge_df['cluster'] = run_kmeans(dim_red_df, num_k, k_seed) 
             df = merge_df 
 
+    df = df.sort_values(by='cluster', ascending=True)
+
     fig = px.scatter(
         df, x=PLOT_XY[0], y=PLOT_XY[1], color=selected_color, color_continuous_scale='Viridis',
         labels={selected_color: selected_color},
@@ -269,9 +277,34 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, t
     clusterscatterfig.update_xaxes(showticklabels=False, title_text='')
     clusterscatterfig.update_yaxes(showticklabels=False, title_text='')
 
+    grouped = df.groupby(['cluster', 'ttype']).size().reset_index(name='count')
+    #print(grouped)
+
+    # Calculate the total count for each cluster
+    cluster_totals = grouped.groupby('cluster')['count'].sum()
+
+    # Merge the grouped data with the total counts
+    result = pd.merge(grouped, cluster_totals, on='cluster', suffixes=('_class', '_total'))
+
+    # Calculate the percentage for each classification within each cluster
+    result['percentage'] = (result['count_class'] / result['count_total']) * 100
+
+    #TODO: Try out other clustering algorithms
+    cluster_line_fig = px.line(
+        result,
+        y='count_class',
+        x='ttype',
+        color='cluster'
+    )
+
+    cluster_line_fig.update_yaxes(title_text='Galaxy Count')
+    cluster_line_fig.update_xaxes(title_text='T-Type')
+
     cluster_perc = pd.DataFrame(df['cluster'].value_counts(normalize=True)*100).reset_index()
     cluster_perc['group'] = ''
     cluster_perc['cluster'] = cluster_perc['cluster']
+
+    cluster_perc = cluster_perc.sort_values(by='cluster', ascending=True)
 
     barfig =px.bar(
             cluster_perc,
@@ -300,7 +333,7 @@ def update_scatterplot(selected_color, n_clicks, embedding_choice, perplexity, t
     barfig.update_yaxes(title_text='')
 
 
-    return fig, clusterscatterfig, barfig, 0
+    return fig, clusterscatterfig, barfig, cluster_line_fig, 0
 
 @app.callback(
     Output('scatterplot', 'config'),
