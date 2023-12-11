@@ -1,10 +1,9 @@
-#MaNGA Galaxy Visualizer
+#Galaxy Vis : Interactive Visualization Tool for MaNGA galaxies
 #Hayden Coffey
 
 import dash
 from dash.dependencies import Input, Output, State
 from dash import ctx
-import plotly.express as px
 import pandas as pd
 import time
 
@@ -47,33 +46,45 @@ def read_fits(fits_path, hdu=1):
     return df
 
 def clean_df(df):
+    print("Cleaning data...")
+    print(f"Starting with : {len(df)} entries")
+
     #Remove outliers
     if 'SFR_1RE' in df:
-        df = df[df['SFR_1RE'] >= -20]
-        df = df[df['SFR_1RE'] <= 20] 
+        df = df[df['SFR_1RE'] >= -100]
+        df = df[df['SFR_1RE'] <= 100] 
+    print(f"After removing SFR_1RE outlier: {len(df)}")
     if 'SFR_TOT' in df:
-        df = df[df['SFR_TOT'] >= -20]
-        df = df[df['SFR_TOT'] <= 20] 
+        df = df[df['SFR_TOT'] >= -100]
+        df = df[df['SFR_TOT'] <= 100] 
+    print(f"After removing SFR_TOT outlier: {len(df)}")
 
     #DAP ALL
     if 'DAPQUAL' in df:
         df = df[df['DAPQUAL'] == 0] 
 
+    print(f"After checking DAPQUAL bitmask: {len(df)}")
+
     #Galaxy Morphology
-    #if 'Unsure' in df:
-        #df = df[df['Unsure'] == 0] 
+    if 'Unsure' in df:
+       df = df[df['Unsure'] == 0] 
+    print(f"After checking Unsure flag: {len(df)}")
 
     debiased_columns = [col for col in df.columns if "debiased" in col]
     for col in debiased_columns:
         df = df[df[col] >= 0] 
         df = df[df[col] <= 1] 
+    print(f"After checking Zoo debiased values: {len(df)}")
 
     df = df.dropna(axis=1)
-
+    print(f"After dropping N/A values: {len(df)}")
     df.rename(columns={col: col.lower() for col in df.columns}, inplace=True)
 
     rows_to_remove = df.map(lambda x: isinstance(x, (int, float)) and x < -9000).any(axis=1)
     df = df[~rows_to_remove] #filter out errors from firefly
+    print(f"After filtering out error values: {len(df)}")
+
+    print(f"Done cleaning data: {len(df)} entries remain.")
 
     return df
 
@@ -176,6 +187,7 @@ def create_directory(directory_path):
 
 #Read in fits files
 zoo_df17_df = read_fits(zoo_df17_file_path)
+print(f"Zoo length : {len(zoo_df17_df)}")
 
 dapall_df = read_fits(dap_all_file_path)
 dapall_df = dapall_df[dapall_df['DAPDONE'] == 1]
@@ -188,8 +200,11 @@ morph_df = read_fits(morph_fits)
 
 #Merge dataframes
 merge_df = (zoo_df17_df.merge(firefly_df, left_on='MANGAID', right_on='MANGAID'))
+print(f"Merge with firefly : {len(merge_df)}")
 merge_df = (merge_df.merge(dapall_df, left_on='MANGAID', right_on='MANGAID'))
+print(f"Merge with dapall: {len(merge_df)}")
 merge_df = (merge_df.merge(morph_df, left_on='MANGAID', right_on='MANGAID'))
+print(f"Merge with morph: {len(merge_df)}")
 
 
 #Remove outliers
