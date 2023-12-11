@@ -18,7 +18,8 @@ from sklearn.preprocessing import MaxAbsScaler
 
 from sklearn.cluster import KMeans, MeanShift
 
-from layout import get_page_layout
+from layout import get_page_layout, get_scatter_fig, get_cluster_scatter_fig, \
+    get_cluster_line_fig, get_cluster_bar_fig
 
 PLOT_XY = []
 
@@ -75,6 +76,21 @@ def get_numeric_df(df):
     non_numeric_columns = df.select_dtypes(include=['object']).columns
     df = df.drop(columns=non_numeric_columns)
     return df
+
+def run_embedding(df, features, embedding_choice, perplexity, tsne_seed):
+    PLOT_XY = None
+    embed_df = None
+
+    numeric_df = get_numeric_df(df)
+    scaled_df = scaler.fit_transform(numeric_df[features])
+
+    if embedding_choice == "pca":
+        embed_df,PLOT_XY = run_pca(scaled_df)
+
+    elif embedding_choice == "tsne":
+        embed_df,PLOT_XY = run_tsne(scaled_df, perplexity=perplexity, seed=tsne_seed)
+
+    return embed_df, PLOT_XY
 
 #Embedding algorithms
 def run_pca(df):
@@ -262,20 +278,10 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
 
     if ctx.triggered_id == "regen-button" and embedding_n_clicks:
         features = galaxy_zoo_list + firefly_list
-
-        if embedding_choice == "pca":
-            scaled_df = scaler.fit_transform(numeric_df[features])
-            dim_red_df,PLOT_XY = run_pca(scaled_df)
-            merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
-            merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
-            df = merge_df 
-
-        elif embedding_choice == "tsne":
-            scaled_df = scaler.fit_transform(numeric_df[features])
-            dim_red_df,PLOT_XY = run_tsne(scaled_df, perplexity=perplexity, seed=tsne_seed)
-            merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
-            merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
-            df = merge_df 
+        dim_red_df,PLOT_XY = run_embedding(numeric_df, features, embedding_choice, perplexity, tsne_seed)
+        merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
+        merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
+        df = merge_df 
 
     elif ctx.triggered_id == "regen-cluster-button" and cluster_n_clicks:
         merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
@@ -283,91 +289,10 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
 
     df = df.sort_values(by='cluster', ascending=True)
 
-    fig = px.scatter(
-        df, x=PLOT_XY[0], y=PLOT_XY[1], color=selected_color, color_continuous_scale='Viridis',
-        labels={selected_color: selected_color},
-        hover_name="mangaid",
-        title='Interactive Scatterplot with Color Selector',
-    )
-
-    if selected_color == 'cluster':
-        fig.update_coloraxes(showscale=False)
-
-    fig.update_layout(
-        coloraxis_colorbar=dict(title=selected_color),
-        height=800,
-    )
-
-    clusterscatterfig = px.scatter(
-        df, x=PLOT_XY[0], y=PLOT_XY[1], color='cluster', color_continuous_scale='Viridis',
-        labels={'cluster': 'cluster'},
-        hover_name="mangaid",
-        title='Clusters in Embedding Space',
-    )
-    clusterscatterfig.update_coloraxes(showscale=False)
-    clusterscatterfig.update_layout(
-        height=400,
-        width=400,
-        margin=dict(l=0)
-    )
-    clusterscatterfig.update_xaxes(showticklabels=False, title_text='')
-    clusterscatterfig.update_yaxes(showticklabels=False, title_text='')
-
-    grouped = df.groupby(['cluster', 'ttype']).size().reset_index(name='count')
-    #print(grouped)
-
-    # Calculate the total count for each cluster
-    cluster_totals = grouped.groupby('cluster')['count'].sum()
-
-    # Merge the grouped data with the total counts
-    result = pd.merge(grouped, cluster_totals, on='cluster', suffixes=('_class', '_total'))
-
-    # Calculate the percentage for each classification within each cluster
-    result['percentage'] = (result['count_class'] / result['count_total']) * 100
-
-    #TODO: Try out other clustering algorithms
-    cluster_line_fig = px.line(
-        result,
-        y='count_class',
-        x='ttype',
-        color='cluster'
-    )
-
-    cluster_line_fig.update_yaxes(title_text='Galaxy Count')
-    cluster_line_fig.update_xaxes(title_text='T-Type')
-
-    cluster_perc = pd.DataFrame(df['cluster'].value_counts(normalize=True)*100).reset_index()
-    cluster_perc['group'] = ''
-    cluster_perc['cluster'] = cluster_perc['cluster']
-
-    cluster_perc = cluster_perc.sort_values(by='cluster', ascending=True)
-
-    barfig =px.bar(
-            cluster_perc,
-            y='group',
-            barmode='stack',
-            x='proportion',
-            color='cluster',
-            orientation='h',
-            custom_data=['proportion', 'cluster'],
-            color_continuous_scale='Viridis',
-        ).update_xaxes(range=[0, 100])  # Set y-axis range from 0 to 100%
-
-    #TODO: Move clustering method down to here and create separate layout section for cluster analysis?
-    #Stacked proportion bar chart
-    barfig.update_traces(
-        hovertemplate="<b>cluster:</b> %{customdata[1]}<extra></extra><br><b>%{customdata[0]:.2f}%</b>"
-    )
-    barfig.update_layout(
-        coloraxis_colorbar=dict(title=selected_color),
-        height=200,
-        title_text='Cluster %',
-    )
-    barfig.update_coloraxes(showscale=False)
-
-    barfig.update_xaxes(title_text='Proportion')
-    barfig.update_yaxes(title_text='')
-
+    fig = get_scatter_fig(df, selected_color, PLOT_XY)
+    clusterscatterfig = get_cluster_scatter_fig(df, PLOT_XY)
+    cluster_line_fig = get_cluster_line_fig(df)
+    barfig = get_cluster_bar_fig(df)
 
     return fig, clusterscatterfig, barfig, cluster_line_fig, 0, 0
 

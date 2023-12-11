@@ -2,6 +2,104 @@
 #Hayden Coffey
 
 from dash import dcc, html
+import plotly.express as px
+import pandas as pd
+
+def get_scatter_fig(df, selected_color, PLOT_XY):
+	fig = px.scatter(
+        df, x=PLOT_XY[0], y=PLOT_XY[1], color=selected_color, color_continuous_scale='Viridis',
+        labels={selected_color: selected_color},
+        hover_name="mangaid",
+        title='Interactive Scatterplot with Color Selector',
+    )
+
+	if selected_color == 'cluster':
+		fig.update_coloraxes(showscale=False)
+
+	fig.update_layout(
+		coloraxis_colorbar=dict(title=selected_color),
+		height=800,
+    )
+
+	return fig
+
+def get_cluster_scatter_fig(df, PLOT_XY):
+    clusterscatterfig = px.scatter(
+        df, x=PLOT_XY[0], y=PLOT_XY[1], color='cluster', color_continuous_scale='Viridis',
+        labels={'cluster': 'cluster'},
+        hover_name="mangaid",
+        title='Clusters in Embedding Space',
+    )
+    clusterscatterfig.update_coloraxes(showscale=False)
+    clusterscatterfig.update_layout(
+        height=400,
+        width=400,
+        margin=dict(l=0)
+    )
+    clusterscatterfig.update_xaxes(showticklabels=False, title_text='')
+    clusterscatterfig.update_yaxes(showticklabels=False, title_text='')
+	
+    return clusterscatterfig
+
+def get_cluster_line_fig(df):
+    grouped = df.groupby(['cluster', 'ttype']).size().reset_index(name='count')
+
+    # Calculate the total count for each cluster
+    cluster_totals = grouped.groupby('cluster')['count'].sum()
+
+    # Merge the grouped data with the total counts
+    result = pd.merge(grouped, cluster_totals, on='cluster', suffixes=('_class', '_total'))
+
+    # Calculate the percentage for each classification within each cluster
+    result['percentage'] = (result['count_class'] / result['count_total']) * 100
+
+    #TODO: Try out other clustering algorithms
+    cluster_line_fig = px.line(
+        result,
+        y='count_class',
+        x='ttype',
+        color='cluster'
+    )
+	
+    cluster_line_fig.update_yaxes(title_text='Galaxy Count')
+    cluster_line_fig.update_xaxes(title_text='T-Type')
+
+    return cluster_line_fig
+
+def get_cluster_bar_fig(df):
+    cluster_perc = pd.DataFrame(df['cluster'].value_counts(normalize=True)*100).reset_index()
+    cluster_perc['group'] = ''
+    cluster_perc['cluster'] = cluster_perc['cluster']
+
+    cluster_perc = cluster_perc.sort_values(by='cluster', ascending=True)
+
+    barfig =px.bar(
+            cluster_perc,
+            y='group',
+            barmode='stack',
+            x='proportion',
+            color='cluster',
+            orientation='h',
+            custom_data=['proportion', 'cluster'],
+            color_continuous_scale='Viridis',
+        ).update_xaxes(range=[0, 100])  # Set y-axis range from 0 to 100%
+
+    #TODO: Move clustering method down to here and create separate layout section for cluster analysis?
+    #Stacked proportion bar chart
+    barfig.update_traces(
+        hovertemplate="<b>cluster:</b> %{customdata[1]}<extra></extra><br><b>%{customdata[0]:.2f}%</b>"
+    )
+    barfig.update_layout(
+        #coloraxis_colorbar=dict(title=selected_color),
+        height=200,
+        title_text='Cluster %',
+    )
+    barfig.update_coloraxes(showscale=False)
+
+    barfig.update_xaxes(title_text='Proportion')
+    barfig.update_yaxes(title_text='')
+
+    return barfig
 
 
 def get_page_layout(label_df, embedding_options, clustering_options, firefly_str):
