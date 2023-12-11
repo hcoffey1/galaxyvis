@@ -150,7 +150,7 @@ def run_isomap(df):
     return tsne_df.reset_index(drop=True),col
 
 #Clustering algorithms
-def run_kmeans(df, k, seed=42):
+def run_kmeans(df, k, seed):
     if seed < 0:
         kmeans = KMeans(n_clusters=k, n_init=10)
     else:
@@ -165,8 +165,9 @@ def run_meanshift(df):
 def run_hdbscan(df):
     return HDBSCAN(min_cluster_size=20).fit(df).labels_.astype(str)
 
-def run_agglomerative(df):
-    return AgglomerativeClustering(n_clusters=3).fit(df).labels_.astype(str)
+def run_agglomerative(df, k):
+    agglocluster = AgglomerativeClustering(n_clusters=k)
+    return agglocluster.fit(df).labels_.astype(str)
 
 def run_clustering(df, algo_name, num_k, k_seed):
     clusters = None
@@ -177,7 +178,7 @@ def run_clustering(df, algo_name, num_k, k_seed):
     elif algo_name == 'hdbscan':
         clusters = run_hdbscan(df)
     elif algo_name == 'agglomerative':
-        clusters = run_agglomerative(df)
+        clusters = run_agglomerative(df, num_k)
 
     return clusters
 
@@ -237,7 +238,7 @@ CURRENT_EMBEDDING = 'pca'
 
 merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
 
-merge_df['cluster'] = run_agglomerative(dim_red_df) 
+merge_df['cluster'] = run_agglomerative(dim_red_df, 3) 
 CURRENT_CLUSTERING = 'agglomerative' 
 
 df = merge_df
@@ -275,12 +276,13 @@ def update_checklists(galaxy_zoo_header, firefly_header):
 def update_embedding_param_visibility(selected_option):
     return {'display': 'none'} if selected_option != 'tsne' else {'display': 'block'}
 
+#TODO: agglomerative doesn't take a random seed, should remove it from input options
 @app.callback(
     Output('clustering-param-container', 'style'),
     Input('clustering-selector', 'value'),
 )
 def update_embedding_param_visibility(selected_option):
-    return {'display': 'none'} if selected_option != 'kmeans' else {'display': 'block'}
+    return {'display': 'none'} if selected_option != 'kmeans' and selected_option != 'agglomerative' else {'display': 'block'}
 
 @app.callback(
     Output('scatterplot', 'figure'),
