@@ -318,12 +318,18 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
     global CURRENT_CLUSTERING 
 
     if ctx.triggered_id == "regen-button" and embedding_n_clicks:
+        print("Running Embedding + Clustering:")
+        start_time = time.time()
         features = galaxy_zoo_list + firefly_list
         dim_red_df,PLOT_XY = run_embedding(numeric_df, features, embedding_choice, perplexity, tsne_seed)
         CURRENT_EMBEDDING = embedding_choice
 
         merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
         merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
+        end_time = time.time()
+        elapsed_time = end_time - start_time 
+        print("Embedding + Clustering Time taken : {} s".format(elapsed_time))
+
         CURRENT_CLUSTERING = clustering_choice 
         df = merge_df 
 
@@ -351,7 +357,7 @@ def click_data_point(clickData):
     else:
         clicked_point_data = clickData['points'][0]
         
-        mangaID = df.loc[clicked_point_data['pointIndex'], 'mangaid']
+        mangaID = clicked_point_data['hovertext'] 
         url = "https://dr17.sdss.org/marvin/galaxy/" + mangaID.strip() + "/"
 
         # Check if a URL exists for the clicked point
@@ -370,7 +376,7 @@ def cluster_click_data_point(clickData):
     else:
         clicked_point_data = clickData['points'][0]
         
-        mangaID = df.loc[clicked_point_data['pointIndex'], 'mangaid']
+        mangaID = clicked_point_data['hovertext'] 
         url = "https://dr17.sdss.org/marvin/galaxy/" + mangaID.strip() + "/"
 
         # Check if a URL exists for the clicked point
