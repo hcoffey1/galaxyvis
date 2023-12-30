@@ -129,11 +129,26 @@ def clean_data(config):
 def select_columns(df, config):
 
     columns = []
-    for rule in config["select"]:
-        #print(rule)
+    base = 0
 
-        if "CONTAINS" in rule:
-            columns += ([col for col in df.columns if rule[1] in col ])#Galaxy Zoo]
+    for rule in config["select"]:
+        if rule[base] == "CONTAINS":
+            contains = True
+            base += 1
+
+        term = rule[base]
+        base += 1
+
+        applyAll = False 
+        if "\"" in term:
+            term = term.strip("\"")
+        elif term == "ALL":
+            applyAll = True
+
+        if contains:
+            columns += ([col for col in df.columns if term in col ])#Galaxy Zoo]
+        else:
+            columns += ([col for col in df.columns if term == col ])#Galaxy Zoo]
 
     return list(set(columns))
 
