@@ -8,23 +8,60 @@ import pandas as pd
 
 TITLE = "Galaxy Vis"
 
+def create_features_list(features):
+
+    divs = []
+
+    for f in features:
+        label = f[0].strip("\"")
+        id = label.lower().replace(" ","-")
+
+        columns = f[1]
+        print(label)
+        print(id)
+        list_div = html.Div([
+                html.Div([
+                    html.B(label, style={'flex': '1'}),
+                    dcc.Checklist(
+                        id= id + '-check-header',
+                        options=[
+                            {'label' : '', 'value': 'ticked'}
+                        ],
+                        value=['ticked']
+                    ),
+                ], style={'display': 'flex', 'width' : 'max-content'}),
+                dcc.Checklist(
+                    id= id + '-checklist',
+                    options=[
+                        {'label': col, 'value': col}
+                        for col in columns
+                    ],
+                    value=columns,
+                )
+            ])
+        
+        divs.append(list_div)
+
+    return divs 
+
+
 def get_scatter_fig(df, selected_color, PLOT_XY):
-	fig = px.scatter(
+    fig = px.scatter(
         df, x=PLOT_XY[0], y=PLOT_XY[1], color=selected_color, color_continuous_scale='Viridis',
         labels={selected_color: selected_color},
         hover_name="mangaid",
         title='Interactive Scatterplot with Color Selector',
     )
 
-	if selected_color == 'cluster':
-		fig.update_coloraxes(showscale=False)
+    if selected_color == 'cluster':
+        fig.update_coloraxes(showscale=False)
 
-	fig.update_layout(
-		coloraxis_colorbar=dict(title=selected_color),
-		height=800,
+    fig.update_layout(
+        coloraxis_colorbar=dict(title=selected_color),
+        height=800,
     )
 
-	return fig
+    return fig
 
 def get_cluster_scatter_fig(df, PLOT_XY):
     clusterscatterfig = px.scatter(
@@ -41,7 +78,7 @@ def get_cluster_scatter_fig(df, PLOT_XY):
     )
     clusterscatterfig.update_xaxes(showticklabels=False, title_text='')
     clusterscatterfig.update_yaxes(showticklabels=False, title_text='')
-	
+    
     return clusterscatterfig
 
 def get_cluster_line_fig(df):
@@ -116,143 +153,145 @@ def get_cluster_bar_fig(df):
     return barfig
 
 
-def get_page_layout(label_df, embedding_options, clustering_options, firefly_str):
-	highlight_feature_div = html.Div([
-			html.B("Highlighted Feature:"),
-			dcc.Dropdown(
-				id="color-selector",
-				options=[{'label': col, 'value': col} for col in label_df.columns],
-				value=label_df.columns[0],  # Initial value
-			),
-		], style={'width': '50%'})
+def get_page_layout(label_df, embedding_options, clustering_options, firefly_str, features):
+    highlight_feature_div = html.Div([
+            html.B("Highlighted Feature:"),
+            dcc.Dropdown(
+                id="color-selector",
+                options=[{'label': col, 'value': col} for col in label_df.columns],
+                value=label_df.columns[0],  # Initial value
+            ),
+        ], style={'width': '50%'})
 
-	scatter_plot_div = html.Div([
-		dcc.Loading(
-			id='loading-indicator',
-			type='circle',  # or 'default'
-			children=[
-				dcc.Graph(id='scatterplot'),
-				]
-			),
-		], style={'flex': '1', 'width': '50%'})
-	
-	embedding_method_div = html.Div([
-			html.B("Embedding Method"),
-			dcc.Dropdown(id="embedding-selector", 
-			options=[{'label': option, 'value': option} for option in embedding_options],
-			value=embedding_options[0]
-			),
-			html.Div(id='embedding-param-container', children=[
-				html.Div([
-					html.Label("Perplexity:"),
-					dcc.Input(id='perplexity-input', type='number', value=100),
-				]),
-				html.Div([
-					html.Label("Random Seed (-1 : Random):"),
-					dcc.Input(id='tsne-seed-input', type='number', value=-1),
-				]),
-			], style={'display': 'none'})
-		], style={'width': '25%'})
+    scatter_plot_div = html.Div([
+        dcc.Loading(
+            id='loading-indicator',
+            type='circle',  # or 'default'
+            children=[
+                dcc.Graph(id='scatterplot'),
+                ]
+            ),
+        ], style={'flex': '1', 'width': '50%'})
+    
+    embedding_method_div = html.Div([
+            html.B("Embedding Method"),
+            dcc.Dropdown(id="embedding-selector", 
+            options=[{'label': option, 'value': option} for option in embedding_options],
+            value=embedding_options[0]
+            ),
+            html.Div(id='embedding-param-container', children=[
+                html.Div([
+                    html.Label("Perplexity:"),
+                    dcc.Input(id='perplexity-input', type='number', value=100),
+                ]),
+                html.Div([
+                    html.Label("Random Seed (-1 : Random):"),
+                    dcc.Input(id='tsne-seed-input', type='number', value=-1),
+                ]),
+            ], style={'display': 'none'})
+        ], style={'width': '25%'})
 
-	clustering_method_div = html.Div([
-			html.B("Clustering Method"),
-			dcc.Dropdown(id="clustering-selector", 
-			options=[{'label': option, 'value': option} for option in clustering_options],
-			value=clustering_options[0]
-			),
-			html.Div(id='clustering-param-container', children=[
-				html.Div([
-					html.Label("k: "),
-					dcc.Input(id='k-input', type='number', value=3),
-				]),
-				html.Div([
-					html.Label("Random Seed (-1 : Random):"),
-					dcc.Input(id='k-seed-input', type='number', value=-1),
-				]),
-			], style={'display': 'none'})
-		], style={'width': '25%'})
-	
-	clustering_div = html.Div([
-		clustering_method_div,
-		dcc.Loading(
-			id='loading-indicator-embeddings',
-			type='circle',  # or 'default'
-			children=[
-				html.Div([
-				dcc.Graph(id='clusterscatter', style={'flex': '1'}),
-				dcc.Graph(id='clusterline'),
-				], style={'display': 'flex'}),
-				dcc.Graph(id='barplot'),
-				]
-			),
-	], style={'width': '50%'})
+    clustering_method_div = html.Div([
+            html.B("Clustering Method"),
+            dcc.Dropdown(id="clustering-selector", 
+            options=[{'label': option, 'value': option} for option in clustering_options],
+            value=clustering_options[0]
+            ),
+            html.Div(id='clustering-param-container', children=[
+                html.Div([
+                    html.Label("k: "),
+                    dcc.Input(id='k-input', type='number', value=3),
+                ]),
+                html.Div([
+                    html.Label("Random Seed (-1 : Random):"),
+                    dcc.Input(id='k-seed-input', type='number', value=-1),
+                ]),
+            ], style={'display': 'none'})
+        ], style={'width': '25%'})
+    
+    clustering_div = html.Div([
+        clustering_method_div,
+        dcc.Loading(
+            id='loading-indicator-embeddings',
+            type='circle',  # or 'default'
+            children=[
+                html.Div([
+                dcc.Graph(id='clusterscatter', style={'flex': '1'}),
+                dcc.Graph(id='clusterline'),
+                ], style={'display': 'flex'}),
+                dcc.Graph(id='barplot'),
+                ]
+            ),
+    ], style={'width': '50%'})
+     
+    features_list = create_features_list(features)
 
-	galaxy_zoo_list_div = html.Div([
-			html.Div([
-				html.B("Galaxy Zoo", style={'flex': '1'}),
-				dcc.Checklist(
-					id='galaxy-zoo-check-header',
-					options=[
-						{'label' : '', 'value': 'ticked'}
-					],
-					value=['ticked']
-				),
-			], style={'display': 'flex', 'width' : 'max-content'}),
-			dcc.Checklist(
-				id='galaxy-zoo-checklist',
-				options=[
-					{'label': col, 'value': col}
-					for col in label_df.columns if 'debiased' in col
-				],
-				value=label_df.columns[label_df.columns.str.contains('debiased')].tolist(),
-			)
-		])
+    features_list.insert(0, html.Summary('Input Features'))
 
-	firefly_list_div = html.Div([
-			html.Div([
-				html.B("Firefly", style={'flex': '1'}),
-				dcc.Checklist(
-					id='firefly-check-header',
-					options=[
-						{'label' : '', 'value': 'ticked'}
-					],
-					value=['ticked']
-				),
-			], style={'display': 'flex', 'width' :'max-content'}),
-			dcc.Checklist(
-				id='firefly-checklist',
-				options=[
-					{'label': col, 'value': col}
-					for col in firefly_str 
-				],
-				value=firefly_str,
-			)
-		])
+    galaxy_zoo_list_div = html.Div([
+            html.Div([
+                html.B("Galaxy Zoo", style={'flex': '1'}),
+                dcc.Checklist(
+                    id='galaxy-zoo-check-header',
+                    options=[
+                        {'label' : '', 'value': 'ticked'}
+                    ],
+                    value=['ticked']
+                ),
+            ], style={'display': 'flex', 'width' : 'max-content'}),
+            dcc.Checklist(
+                id='galaxy-zoo-checklist',
+                options=[
+                    {'label': col, 'value': col}
+                    for col in label_df.columns if 'debiased' in col
+                ],
+                value=label_df.columns[label_df.columns.str.contains('debiased')].tolist(),
+            )
+        ])
 
-	return html.Div([
-		html.H1(TITLE),
-		html.P("Galaxy Count: {}".format(label_df.shape[0])),
+    firefly_list_div = html.Div([
+            html.Div([
+                html.B("Firefly", style={'flex': '1'}),
+                dcc.Checklist(
+                    id='firefly-check-header',
+                    options=[
+                        {'label' : '', 'value': 'ticked'}
+                    ],
+                    value=['ticked']
+                ),
+            ], style={'display': 'flex', 'width' :'max-content'}),
+            dcc.Checklist(
+                id='firefly-checklist',
+                options=[
+                    {'label': col, 'value': col}
+                    for col in firefly_str 
+                ],
+                value=firefly_str,
+            )
+        ])
 
-		highlight_feature_div,
+    return html.Div([
+        html.H1(TITLE),
+        html.P("Galaxy Count: {}".format(label_df.shape[0])),
 
-		html.Div([
-			scatter_plot_div,
+        highlight_feature_div,
 
-			html.Div([
-				html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
-				embedding_method_div,
-
-				html.Details([
-					html.Summary('Input Features'),
-					galaxy_zoo_list_div,
-					firefly_list_div,
-				], style={'width': 'max-content'}),
-			], style={'width': '50%'}),
-		], style={'display': 'flex'}),
-		html.Button('Calculate Clusters', id='regen-cluster-button', n_clicks=0),
-		clustering_div,
         html.Div([
-			html.Button('Export Cluster Data', id='export-cluster-button', n_clicks=0, style={'width' : 'max-content'}),
-			html.Div(id='output-message', style={'flex' : '1'}),
-		], style={'display':'flex'}),
-	])
+            scatter_plot_div,
+
+            html.Div([
+                html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
+                embedding_method_div,
+
+                html.Details(
+                   features_list 
+                , style={'width': 'max-content'}),
+            ], style={'width': '50%'}, id='features-list'),
+        ], style={'display': 'flex'}),
+        html.Button('Calculate Clusters', id='regen-cluster-button', n_clicks=0),
+        clustering_div,
+        html.Div([
+            html.Button('Export Cluster Data', id='export-cluster-button', n_clicks=0, style={'width' : 'max-content'}),
+            html.Div(id='output-message', style={'flex' : '1'}),
+        ], style={'display':'flex'}),
+    ])

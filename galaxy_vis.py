@@ -2,7 +2,7 @@
 #Hayden Coffey
 
 import dash
-from dash.dependencies import Input, Output, State
+from dash.dependencies import Input, Output, State, ALL
 from dash import ctx
 import pandas as pd
 import time
@@ -152,9 +152,9 @@ merge_df = data_pairs[0][1]
 selected_features = [[data_pairs[0][0]['label'], data_pairs[0][2]]]
 for pair in data_pairs[1:]:
     merge_df = (merge_df.merge(pair[1], left_on='MANGAID', right_on='MANGAID'))
-    selected_features += [pair[0]['label'], pair[2]]
+    selected_features += [[pair[0]['label'], pair[2]]]
 
-print(selected_features)
+#print(selected_features)
 merge_df.rename(columns={col: col.lower() for col in merge_df.columns}, inplace=True)
 print("MERGE LEN: ", len(merge_df))
 
@@ -199,7 +199,7 @@ app = dash.Dash(__name__)
 embedding_options=['pca', 'tsne']
 clustering_options=['agglomerative', 'hdbscan', 'kmeans', 'meanshift']
 
-app.layout = get_page_layout(label_df, embedding_options, clustering_options, firefly_str)
+app.layout = get_page_layout(label_df, embedding_options, clustering_options, firefly_str, selected_features)
 
 # Callback to handle header checkbox changes
 @app.callback(
@@ -246,15 +246,14 @@ def update_embedding_param_visibility(selected_option):
     State('embedding-selector', 'value'),
     State('perplexity-input', 'value'),
     State('tsne-seed-input', 'value'),
-    State('galaxy-zoo-checklist', 'value'),
-    State('firefly-checklist', 'value'),
     State('clustering-selector', 'value'),
     State('k-input', 'value'),
     State('k-seed-input', 'value'),
+    State('features-list', 'children'),
 )
 def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
-                        embedding_choice, perplexity, tsne_seed, galaxy_zoo_list,
-                        firefly_list, clustering_choice, num_k, k_seed):
+                        embedding_choice, perplexity, tsne_seed,
+                        clustering_choice, num_k, k_seed, list_values):
     global df
     global PLOT_XY 
     global scaled_df 
@@ -267,7 +266,11 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
     if ctx.triggered_id == "regen-button" and embedding_n_clicks:
         print("Running Embedding + Clustering:")
         start_time = time.time()
-        features = galaxy_zoo_list + firefly_list
+        features = []
+        for c in (list_values[2]['props']['children'][1:]):
+            features += (c['props']['children'][1]['props']['value'])
+        print("Features selected: ", features)
+
         dim_red_df,PLOT_XY = run_embedding(numeric_df, features, embedding_choice, perplexity, tsne_seed)
         CURRENT_EMBEDDING = embedding_choice
 
