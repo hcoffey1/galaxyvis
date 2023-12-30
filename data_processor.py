@@ -1,6 +1,16 @@
 import os
 import shlex
 import pandas as pd
+from enum import Enum
+
+
+class Operation(Enum):
+    inRange = 0
+    le = 1
+    leq = 2
+    ge = 3
+    geq = 4
+    eq =54
 
 from astropy.table import Table
 
@@ -21,48 +31,98 @@ def clean_data(config):
 
     df = None
 
-
     #Read input file
     if config["type"] == "fits":
        df_list = []
        for hdu in config["hdu"]:
-           #print(hdu)
            df_list += [read_fits(filePath, hdu)]
 
        df = pd.concat(df_list, axis=1)
 
-       #df = read_fits(filePath)
-
-    #Set columns to lowercase
-    #df.rename(columns={col: col.lower() for col in df.columns}, inplace=True)
-
     for rule in config["filter"]:
+        dropping = False
+        contains = False
+        base = 0
 
-        if "==" in rule:
-            index = rule.index("==")
-            df = df[df[rule[index-1]] == float(rule[index+1])]
-
-        if "CONTAINS" in rule:
-            term = (rule[rule.index("CONTAINS") + 1])
-
-            if "RANGE" in rule:
-                range = (rule[rule.index("RANGE") + 1])
-                range = range.split(',')
-
-                filtered_columns = [col for col in df.columns if term in col]
-                for col in filtered_columns:
-                    df = df[df[col] >= float(range[0])] 
-                    df = df[df[col] <= float(range[1])] 
-        
-        if "DROP" in rule:
-            if "NA" in rule:
+        #Remove instead of select for
+        if rule[base] == "DROP":
+            dropping = True
+            base += 1
+            if rule[base] == "NA":
                 df = df.dropna(axis=1)
-        
-        if "ALL" in rule:
-            index = rule.index("ALL")
-            rows_to_remove = df.map(lambda x: isinstance(x, (int, float)) and x < float(rule[index+2])).any(axis=1)
-            df = df[~rows_to_remove] #filter out errors from firefly
+                continue
 
+        #Partial matching 
+        if rule[base] == "CONTAINS":
+            contains = True
+            base += 1
+
+        term = rule[base]
+        base += 1
+
+        op = None
+        if rule[base] == "IN" and rule[base+1] == "RANGE":
+            op = Operation.inRange
+            base += 2
+        else:
+            if rule[base] == "<":
+                op = Operation.le
+            elif rule[base] == "<=":
+                op = Operation.leq
+            elif rule[base] == ">":
+                op = Operation.ge
+            elif rule[base] == ">=":
+                op = Operation.geq
+            elif rule[base] == "==":
+                op = Operation.eq
+            else:
+                print("Unsupported operation! ", rule)
+            base += 1
+
+        applyAll = False 
+        if "\"" in term:
+            term = term.strip("\"")
+        elif term == "ALL":
+            applyAll = True
+
+        if applyAll:
+            filtered_columns = df.columns 
+        elif contains:
+            filtered_columns = [col for col in df.columns if term in col]
+        else:
+            filtered_columns = [col for col in df.columns if term == col]
+
+        if op == Operation.inRange:
+            range = rule[base].split(',')
+
+            mask = ((df[filtered_columns] >= float(range[0])) 
+                    & (df[filtered_columns] <= float(range[1]))).all(axis=1)
+
+            if dropping:
+                df = df[~mask]
+            else:
+                df = df[mask]
+        
+        if op == Operation.eq:
+            mask = (df[filtered_columns] == float(rule[base])).all(axis=1)
+            if dropping:
+                df = df[~mask]
+            else:
+                df = df[mask]
+
+        elif op == Operation.ge:
+            if dropping:
+                if applyAll:
+                    mask = df.map(lambda x: isinstance(x, (int, float)) and x > float(rule[base])).any(axis=1)
+                else:
+                    mask = (df[filtered_columns] > float(rule[base])).all(axis=1)
+            else:
+                if applyAll:
+                    mask = df.map(lambda x: isinstance(x, (int, float)) and x <= float(rule[base])).any(axis=1)
+                else:
+                    mask = (df[filtered_columns] <= float(rule[base])).all(axis=1)
+
+            df = df[~mask]
 
     return df
 
@@ -95,7 +155,7 @@ def parse_config(filePath):
             # Remove comments by ignoring text after '#'
             line = line.split('#', 1)[0].strip()
             if line:  # Check if the line is not empty after removing comments
-                tokens = shlex.split(line)
+                tokens = shlex.split(line, posix=False)
 
                 if tokens[0] == "TYPE":
                     config['type'] = tokens[1]
@@ -104,21 +164,11 @@ def parse_config(filePath):
                 elif tokens[0] == "LABEL":
                     config['label'] = tokens[1]
                 elif tokens[0] == "META":
-                    metaPhase = True
-                elif metaPhase:
-                    if tokens[0] == "FILTER":
-                        metaPhase = False 
-                        filtering = True
-                        continue
-                    metaRules.append(tokens)
-                elif filtering:
-                    if tokens[0] == "SELECT":
-                        filtering = False
-                        selecting = True
-                        continue
-                    filterRules.append(tokens)
-                elif selecting:
-                    selectRules.append(tokens)
+                    metaRules.append(tokens[1:])
+                elif tokens[0] == "FILTER":
+                    filterRules.append(tokens[1:])
+                elif tokens[0] == "SELECT":
+                    selectRules.append(tokens[1:])
 
     config["meta"] = metaRules 
     config["filter"] = filterRules
