@@ -1,6 +1,14 @@
 import os
 import shlex
 import pandas as pd
+import time
+
+from astropy.table import Table
+from sklearn.cluster import KMeans, MeanShift, HDBSCAN, AgglomerativeClustering
+from sklearn.manifold import TSNE, Isomap
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MaxAbsScaler
+
 from enum import Enum
 
 
@@ -246,3 +254,97 @@ def read_data(directory):
 #directory_path = './data'
 
 #read_data(directory_path)
+def get_numeric_df(df):
+    #Remove non-numeric data
+    non_numeric_columns = df.select_dtypes(include=['object']).columns
+    df = df.drop(columns=non_numeric_columns)
+    return df
+
+def run_embedding(df, features, embedding_choice, perplexity, tsne_seed):
+    PLOT_XY = None
+    embed_df = None
+
+    numeric_df = get_numeric_df(df)
+    scaler = MaxAbsScaler()
+    scaled_df = scaler.fit_transform(numeric_df[features])
+
+    if embedding_choice == "pca":
+        embed_df,PLOT_XY = run_pca(scaled_df)
+
+    elif embedding_choice == "tsne":
+        embed_df,PLOT_XY = run_tsne(scaled_df, perplexity=perplexity, seed=tsne_seed)
+
+    return embed_df, PLOT_XY
+
+#Embedding algorithms
+def run_pca(df):
+    print("Running PCA:")
+    start_time = time.time()
+
+    col = ['pc1', 'pc2']
+    pca = PCA(n_components=2)
+    pca_df = pd.DataFrame(pca.fit_transform(df), columns=col)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time 
+    print("Time taken : {} s".format(elapsed_time))
+
+    return pca_df.reset_index(drop=True),col
+
+def run_tsne(df, perplexity=50, seed=42):
+    print("Running TSNE, perplexity: {}, seed: {}".format(perplexity, seed))
+    start_time = time.time()
+
+    col = ['tsne1', 'tsne2']
+    tsne_model = None 
+    if seed < 0:
+        tsne_model = TSNE(n_components=2, perplexity=perplexity)
+    else:
+        tsne_model = TSNE(n_components=2, perplexity=perplexity, random_state=seed)
+
+    tsne_df = pd.DataFrame(tsne_model.fit_transform(df), columns=col)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time 
+    print("Time taken : {} s".format(elapsed_time))
+
+    return tsne_df.reset_index(drop=True),col
+
+def run_isomap(df):
+    col = ['iso1', 'iso2']
+    tsne_model = Isomap(n_components=2)
+    tsne_df = pd.DataFrame(tsne_model.fit_transform(df), columns=col)
+    return tsne_df.reset_index(drop=True),col
+
+#Clustering algorithms
+def run_kmeans(df, k, seed):
+    if seed < 0:
+        kmeans = KMeans(n_clusters=k, n_init=10)
+    else:
+        kmeans = KMeans(n_clusters=k, random_state=seed, n_init=10)
+
+    kmeans.fit(df)
+    return kmeans.labels_.astype(str)
+
+def run_meanshift(df):
+    return MeanShift().fit(df).labels_.astype(str)
+
+def run_hdbscan(df):
+    return HDBSCAN(min_cluster_size=20).fit(df).labels_.astype(str)
+
+def run_agglomerative(df, k):
+    agglocluster = AgglomerativeClustering(n_clusters=k)
+    return agglocluster.fit(df).labels_.astype(str)
+
+def run_clustering(df, algo_name, num_k, k_seed):
+    clusters = None
+    if algo_name == 'kmeans':
+        clusters = run_kmeans(df, num_k, k_seed) 
+    elif algo_name == 'meanshift':
+        clusters = run_meanshift(df)
+    elif algo_name == 'hdbscan':
+        clusters = run_hdbscan(df)
+    elif algo_name == 'agglomerative':
+        clusters = run_agglomerative(df, num_k)
+
+    return clusters
