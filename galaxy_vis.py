@@ -21,7 +21,7 @@ from sklearn.preprocessing import MaxAbsScaler
 from sklearn.cluster import KMeans, MeanShift, HDBSCAN, AgglomerativeClustering
 
 from layout import get_page_layout, get_scatter_fig, get_cluster_scatter_fig, \
-    get_cluster_line_fig, get_cluster_bar_fig
+    get_cluster_line_fig, get_cluster_bar_fig, swap_layout
 
 from data_processor import read_data
 
@@ -194,12 +194,12 @@ excluded_labels = ['mangaid', 'pc1', 'pc2', 'tsne1', 'tsne2', 'iso1', 'iso2']
 
 label_df = df.drop(excluded_labels, axis=1, errors='ignore')
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
 embedding_options=['pca', 'tsne']
 clustering_options=['agglomerative', 'hdbscan', 'kmeans', 'meanshift']
 
-app.layout = get_page_layout(label_df, embedding_options, clustering_options, firefly_str, selected_features)
+app.layout = get_page_layout(label_df, embedding_options, clustering_options, selected_features)
 
 # Callback to handle header checkbox changes
 @app.callback(
@@ -219,6 +219,7 @@ def update_checklists(galaxy_zoo_header, firefly_header):
 @app.callback(
     Output('embedding-param-container', 'style'),
     Input('embedding-selector', 'value'),
+    prevent_initial_call=True,
 )
 def update_embedding_param_visibility(selected_option):
     return {'display': 'none'} if selected_option != 'tsne' else {'display': 'block'}
@@ -227,6 +228,7 @@ def update_embedding_param_visibility(selected_option):
 @app.callback(
     Output('clustering-param-container', 'style'),
     Input('clustering-selector', 'value'),
+    prevent_initial_call=True,
 )
 def update_embedding_param_visibility(selected_option):
     return {'display': 'none'} if selected_option != 'kmeans' and selected_option != 'agglomerative' else {'display': 'block'}
@@ -250,6 +252,7 @@ def update_embedding_param_visibility(selected_option):
     State('k-input', 'value'),
     State('k-seed-input', 'value'),
     State('features-list', 'children'),
+    prevent_initial_call=True,
 )
 def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
                         embedding_choice, perplexity, tsne_seed,
@@ -300,6 +303,7 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
 @app.callback(
     Output('scatterplot', 'config'),
     Input('scatterplot', 'clickData'),
+    prevent_initial_call=True,
 )
 def click_data_point(clickData):
     if clickData is None:
@@ -319,6 +323,7 @@ def click_data_point(clickData):
 @app.callback(
     Output('clusterscatter', 'config'),
     Input('clusterscatter', 'clickData'),
+    prevent_initial_call=True,
 )
 def cluster_click_data_point(clickData):
     if clickData is None:
@@ -359,6 +364,30 @@ def update_message(n_clicks):
         output_df = merge_df[['mangaid', 'cluster']]
         output_df.to_csv(output_dir + outputfile)
         return f'Exported to {output_dir + outputfile}',0
+
+# Callback to switch layouts based on button click
+@app.callback(
+    Output('page-content', 'children'),
+    [Input('url', 'pathname')],
+)
+def display_page(pathname):
+    return swap_layout(pathname) 
+
+@app.callback(
+    Output('url', 'pathname'),
+    [Input('switch-button', 'n_clicks')],
+    [State('url', 'pathname')],
+)
+def switch_layout(n_clicks, current_path):
+    if n_clicks is None:
+        # No button click yet
+        return current_path
+
+    print("Current path:", current_path) 
+    if current_path == '/manga' or current_path == '/':
+        return '/decals'
+    else:
+        return '/manga'
 
 if __name__ == '__main__':
     app.run_server(debug=True)

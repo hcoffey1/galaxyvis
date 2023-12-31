@@ -26,3 +26,6 @@ wget https://data.sdss.org/sas/dr17/manga/spectro/firefly/v3_1_1/manga-firefly-g
 
 #Galaxy Morphologies
 wget https://data.sdss.org/sas/dr17/env/MANGA_MORPHOLOGY/manga_visual_morpho/2.0.1/manga_visual_morpho-2.0.1.fits
+
+#decals galaxy zoo
+wget https://zenodo.org/records/4573248/files/gz_decals_auto_posteriors.parquet?download=1
