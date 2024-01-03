@@ -51,23 +51,39 @@ def get_embedding_method_div(id, embedding_options):
             ], style={'display': 'none'})
         ], style={'width': '25%'})
 
-def init_decals_layout(label_df, embedding_options):
+def get_embedding_layout_div(id, label_df, embedding_options, features_list):
+    highlight_feature_div = get_highlight_feature_div(id,label_df)
+    scatter_plot_div = get_scatter_plot_div(id)
+    embedding_method_div = get_embedding_method_div(id,embedding_options)
+
+    return html.Div([
+        highlight_feature_div,
+
+        html.Div([
+            scatter_plot_div,
+
+            html.Div([
+                html.Button('Regenerate Graph', id=id+'-regen-button', n_clicks=0),
+                embedding_method_div,
+
+                html.Details(
+                   features_list 
+                , style={'width': 'max-content'}),
+            ], style={'width': '50%'}, id=id+'-features-list'),
+        ], style={'display': 'flex'})])
+
+def init_decals_layout(label_df, embedding_options, features):
     global DECALS_LAYOUT
-    highlight_feature_div = get_highlight_feature_div('decals',label_df)
 
-    scatter_plot_div = get_scatter_plot_div('decals')
+    features_list = create_features_list(features)
+    features_list.insert(0, html.Summary('Input Features'))
 
-    embedding_method_div = get_embedding_method_div('decals',embedding_options)
-    DECALS_LAYOUT = html.Div([html.H2('DECaLS'), highlight_feature_div, scatter_plot_div, embedding_method_div])
+    embedding_div = get_embedding_layout_div('decals', label_df, embedding_options, features_list)
+
+    DECALS_LAYOUT = html.Div([html.H2('DECaLS'), embedding_div])
 
 def init_manga_layout(label_df, embedding_options, clustering_options, features):
     global MANGA_LAYOUT
-
-    highlight_feature_div = get_highlight_feature_div('manga',label_df)
-
-    scatter_plot_div = get_scatter_plot_div('manga')
-
-    embedding_method_div = get_embedding_method_div('manga',embedding_options)
 
     clustering_method_div = html.Div([
             html.B("Clustering Method"),
@@ -106,24 +122,14 @@ def init_manga_layout(label_df, embedding_options, clustering_options, features)
 
     features_list.insert(0, html.Summary('Input Features'))
 
+    embedding_layout = get_embedding_layout_div('manga', label_df, embedding_options, features_list)
+
     MANGA_LAYOUT = html.Div([
         html.H2("MaNGA"),
         html.P("Galaxy Count: {}".format(label_df.shape[0])),
 
-        highlight_feature_div,
+        embedding_layout,
 
-        html.Div([
-            scatter_plot_div,
-
-            html.Div([
-                html.Button('Regenerate Graph', id='regen-button', n_clicks=0),
-                embedding_method_div,
-
-                html.Details(
-                   features_list 
-                , style={'width': 'max-content'}),
-            ], style={'width': '50%'}, id='features-list'),
-        ], style={'display': 'flex'}),
         html.Button('Calculate Clusters', id='regen-cluster-button', n_clicks=0),
         clustering_div,
         html.Div([
@@ -170,11 +176,11 @@ def create_features_list(features):
     return divs 
 
 
-def get_scatter_fig(df, selected_color, PLOT_XY):
+def get_scatter_fig(df, selected_color, PLOT_XY, hovername):
     fig = px.scatter(
         df, x=PLOT_XY[0], y=PLOT_XY[1], color=selected_color, color_continuous_scale='Viridis',
         labels={selected_color: selected_color},
-        hover_name="mangaid",
+        hover_name=hovername,
         title='Interactive Scatterplot with Color Selector',
     )
 
@@ -280,7 +286,7 @@ def get_cluster_bar_fig(df):
 
 def get_page_layout(label_df_manga, label_df_decals, embedding_options, clustering_options, features_manga, features_decals):
     init_manga_layout(label_df_manga,embedding_options, clustering_options,features_manga)
-    init_decals_layout(label_df_decals, embedding_options)
+    init_decals_layout(label_df_decals, embedding_options, features_decals)
 
     return html.Div([
         dcc.Location(id='url', refresh=False),
