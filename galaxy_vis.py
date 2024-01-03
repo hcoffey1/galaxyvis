@@ -12,85 +12,33 @@ import os
 
 import webbrowser
 
-from sklearn.preprocessing import MaxAbsScaler
-
 from src.layout import get_page_layout, get_scatter_fig, get_cluster_scatter_fig, \
     get_cluster_line_fig, get_cluster_bar_fig, swap_layout
 
-from src.data_processor import read_data, get_numeric_df, run_pca, run_agglomerative, \
-    run_embedding, run_clustering
+from src.data_processor import run_embedding, run_clustering, prepare_data 
 
 PLOT_XY = []
 
 CURRENT_EMBEDDING = None
 CURRENT_CLUSTERING = None
 
-# Define the path to your FITS file
-zoo_df17_file_path = "./data/MaNGA_gz-v2_0_1.fits"
-firefly_file_path= "./data/manga-firefly-globalprop-v3_1_1-mastar.fits"
-dap_all_file_path = "./data/dapall-v3_1_1-3.1.0.fits"
-morph_fits = "./data/manga_visual_morpho-2.0.1.fits"
-
-dim_red_df = None
-
 def create_directory(directory_path):
     if not os.path.exists(directory_path):
         os.makedirs(directory_path)
 
-data_pairs = (read_data("./data"))
-
-#Merge dataframes
-merge_df = data_pairs[0][1]
-selected_features = [[data_pairs[0][0]['label'], data_pairs[0][2]]]
-for pair in data_pairs[1:]:
-    merge_df = (merge_df.merge(pair[1], left_on='MANGAID', right_on='MANGAID'))
-    selected_features += [[pair[0]['label'], pair[2]]]
-
-#print(selected_features)
-merge_df.rename(columns={col: col.lower() for col in merge_df.columns}, inplace=True)
-print("MERGE LEN: ", len(merge_df))
-
-#Remove non-numeric data
-numeric_df = get_numeric_df(merge_df)
-
-#Select features of interest
-firefly_str = ["lw_age_1re", "mw_age_1re", "lw_z_1re", "mw_z_1re", "redshift", "photometric_mass"]
-meta_str = ["ttype", "unsure"]
-debiased_columns = [
-    col for col in numeric_df.columns if "debiased" in col #Galaxy Zoo
-    or [s for s in firefly_str if s.lower() in col.lower() and "error" not in col.lower()] #Firefly
-    or [s for s in meta_str if s.lower() in col.lower() and "error" not in col.lower()] #Meta data
-    ]
-
-numeric_df = numeric_df[debiased_columns]
-
-#Scale data before PCA
-scaler = MaxAbsScaler()
-scaled_df = scaler.fit_transform(numeric_df)
-
-#Merge PCA back into original data
-merge_df = merge_df.reset_index(drop=True)
-numeric_df = numeric_df.reset_index(drop=True)
-
-dim_red_df,PLOT_XY = run_pca(scaled_df)
-CURRENT_EMBEDDING = 'pca' 
-
-merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
-
-merge_df['cluster'] = run_agglomerative(dim_red_df, 3) 
-CURRENT_CLUSTERING = 'agglomerative' 
-
-df = merge_df
+manga_data, decals_data = prepare_data("./data")
+numeric_df = manga_data[0]
+merge_df = manga_data[1]
+selected_features = manga_data[2]
 
 excluded_labels = ['mangaid', 'pc1', 'pc2', 'tsne1', 'tsne2', 'iso1', 'iso2']
 
-label_df = df.drop(excluded_labels, axis=1, errors='ignore')
-
-app = dash.Dash(__name__, suppress_callback_exceptions=True)
+label_df = merge_df.drop(excluded_labels, axis=1, errors='ignore')
 
 embedding_options=['pca', 'tsne']
 clustering_options=['agglomerative', 'hdbscan', 'kmeans', 'meanshift']
 
+app = dash.Dash(__name__, suppress_callback_exceptions=True)
 app.layout = get_page_layout(label_df, embedding_options, clustering_options, selected_features)
 
 # Callback to handle header checkbox changes
@@ -149,15 +97,14 @@ def update_embedding_param_visibility(selected_option):
 def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
                         embedding_choice, perplexity, tsne_seed,
                         clustering_choice, num_k, k_seed, list_values):
-    global df
+    #global df
     global PLOT_XY 
-    global scaled_df 
     global numeric_df 
     global merge_df 
-    global dim_red_df
     global CURRENT_EMBEDDING
     global CURRENT_CLUSTERING 
 
+    #Run embedding and clustering
     if ctx.triggered_id == "regen-button" and embedding_n_clicks:
         print("Running Embedding + Clustering:")
         start_time = time.time()
@@ -176,13 +123,13 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
         print("Embedding + Clustering Time taken : {} s".format(elapsed_time))
 
         CURRENT_CLUSTERING = clustering_choice 
-        df = merge_df 
 
+    #Run only clustering
     elif ctx.triggered_id == "regen-cluster-button" and cluster_n_clicks:
         merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
         CURRENT_CLUSTERING = clustering_choice 
-        df = merge_df
 
+    df = merge_df
     df = df.sort_values(by='cluster', ascending=True)
 
     fig = get_scatter_fig(df, selected_color, PLOT_XY)

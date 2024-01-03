@@ -46,6 +46,9 @@ def clean_data(config):
            df_list += [read_fits(filePath, hdu)]
 
        df = pd.concat(df_list, axis=1)
+    
+    elif config["type"] == "parquet":
+        df = pd.read_parquet(filePath)
 
     for rule in config["filter"]:
         dropping = False
@@ -185,6 +188,8 @@ def parse_config(filePath):
                     config['type'] = tokens[1]
                 elif tokens[0] == "HDU":
                     config['hdu'] = ([int(x) for x in tokens[1].split(',')])
+                elif tokens[0] == "SURVEY":
+                    config['survey'] = tokens[1]
                 elif tokens[0] == "LABEL":
                     config['label'] = tokens[1]
                 elif tokens[0] == "META":
@@ -212,14 +217,6 @@ def process_data(filePath):
     if config == None:
         return
 
-
-    if "decals" in dataName.lower():
-		#decals dataset
-        pass	
-    else:
-		#manga dataset
-        pass
-    
 	#Clean data
     #print("Cleaning data")
     df = (clean_data(config))
@@ -235,7 +232,8 @@ def process_data(filePath):
 
 def read_data(directory):
 
-    dataPairs = []
+    dataPairs_manga = []
+    dataPairs_decals = []
     try:
         # Iterate over files in the directory
         for filename in os.listdir(directory):
@@ -243,13 +241,18 @@ def read_data(directory):
             if os.path.isfile(os.path.join(directory, filename)):
                 pair = process_data(os.path.join(directory, filename))
                 if pair != None:
-                    dataPairs += [pair]
+                    if pair[0]['survey'] == 'decals':
+                        dataPairs_decals += [pair]
+                    elif pair[0]['survey'] == 'manga':
+                        dataPairs_manga += [pair]
+                    else:
+                        print("Warning: Unsupported survey ", pair[0]['survey'])
                 #read_data(parse_config(os.path.join(directory, filename)))
 
     except OSError as e:
         print(f"Error reading directory: {e}")
 
-    return dataPairs
+    return dataPairs_manga, dataPairs_decals
 
 #directory_path = './data'
 
@@ -348,3 +351,53 @@ def run_clustering(df, algo_name, num_k, k_seed):
         clusters = run_agglomerative(df, num_k)
 
     return clusters
+
+def merge_data(data_pairs, key):
+    merge_df = data_pairs[0][1]
+    selected_features = [[data_pairs[0][0]['label'], data_pairs[0][2]]]
+    for pair in data_pairs[1:]:
+        merge_df = (merge_df.merge(pair[1], left_on=key, right_on=key))
+        selected_features += [[pair[0]['label'], pair[2]]]
+
+    return merge_df, selected_features
+
+def prepare_data(file_path):
+    #Read and clean data
+    data_pairs_manga, data_pairs_decals = (read_data(file_path))
+
+    #Merge dataframes
+    merge_df_manga, selected_features_manga = merge_data(data_pairs_manga, 'MANGAID')
+    merge_df_decals, selected_features_decals = merge_data(data_pairs_decals, 'iauname')
+    print(merge_df_decals)
+    print(selected_features_decals)
+
+    #print(selected_features)
+    merge_df_manga.rename(columns={col: col.lower() for col in merge_df_manga.columns}, inplace=True)
+    merge_df_decals.rename(columns={col: col.lower() for col in merge_df_decals.columns}, inplace=True)
+
+    #Remove non-numeric data
+    numeric_df_manga = get_numeric_df(merge_df_manga)
+    numeric_df_decals = get_numeric_df(merge_df_decals)
+
+    #Select features of interest
+    selected_manga = []
+    for f in selected_features_manga:
+        selected_manga += (f[1])
+
+    selected_decals = []
+    for f in selected_features_decals:
+        selected_decals += (f[1])
+
+    numeric_df_manga = numeric_df_manga[selected_manga]
+    numeric_df_decals = numeric_df_decals[selected_decals]
+
+    merge_df_manga = merge_df_manga.reset_index(drop=True)
+    numeric_df_manga = numeric_df_manga.reset_index(drop=True)
+
+    merge_df_decals = merge_df_decals.reset_index(drop=True)
+    numeric_df_decals = numeric_df_decals.reset_index(drop=True)
+
+    merge_df_manga = pd.concat([numeric_df_manga, merge_df_manga['mangaid']], axis=1, ignore_index=False)
+    merge_df_decals = pd.concat([numeric_df_decals, merge_df_decals['iauname']], axis=1, ignore_index=False)
+
+    return [numeric_df_manga, merge_df_manga, selected_features_manga], [numeric_df_decals, merge_df_decals, selected_features_decals]
