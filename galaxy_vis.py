@@ -103,11 +103,11 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
                         embedding_choice, perplexity, tsne_seed,
                         clustering_choice, num_k, k_seed, list_values):
     #global df
-    global PLOT_XY 
+    #global PLOT_XY 
     global manga_numeric_df 
     global manga_merge_df 
-    global CURRENT_EMBEDDING
-    global CURRENT_CLUSTERING 
+    #global CURRENT_EMBEDDING
+    #global CURRENT_CLUSTERING 
 
     #Run embedding and clustering
     if ctx.triggered_id == "manga-regen-button" and embedding_n_clicks:

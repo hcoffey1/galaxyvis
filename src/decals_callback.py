@@ -53,6 +53,7 @@ def decals_callbacks(app):
 		decals_merge_df = (pd.read_json(StringIO(decals_data), orient='split'))
 		decals_numeric_df = decals_merge_df.drop("iauname", axis=1)
 
+		dim_red_df = pd.DataFrame()
 		updated_embeddings = None
 		fig = None
 		if decals_embedding_data:
@@ -79,19 +80,23 @@ def decals_callbacks(app):
 
 			#cur_clustering = clustering_choice 
 		else:
-			decals_merge_df = pd.concat([decals_merge_df, dim_red_df], axis=1, ignore_index=False)
-
-			updated_embeddings = dim_red_df.reset_index(drop=True).to_json(orient='split')
+			if not dim_red_df.empty:
+				decals_merge_df = pd.concat([decals_merge_df, dim_red_df], axis=1, ignore_index=False)
+				updated_embeddings = dim_red_df.reset_index(drop=True).to_json(orient='split')
 
 		#Run only clustering
 		#elif ctx.triggered_id == "regen-cluster-button" and cluster_n_clicks:
 		#    merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
 		#    cur_clustering = clustering_choice 
 
-		df = decals_merge_df
 		#df = df.sort_values(by='cluster', ascending=True)
 
-		fig = get_scatter_fig(df, selected_color, cur_xy, 'iauname')
+		#if dim_red_df.empty:
+		#	fig = None;
+		#else:
+		#	print(df)
+		fig = get_scatter_fig(decals_merge_df, selected_color, cur_xy, 'iauname')
+
 		#clusterscatterfig = get_cluster_scatter_fig(df, PLOT_XY)
 		#cluster_line_fig = get_cluster_line_fig(df)
 		#barfig = get_cluster_bar_fig(df)

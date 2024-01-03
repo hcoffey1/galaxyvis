@@ -177,6 +177,9 @@ def create_features_list(features):
 
 
 def get_scatter_fig(df, selected_color, PLOT_XY, hovername):
+    if df.empty or not PLOT_XY:
+        return px.scatter()
+
     fig = px.scatter(
         data_frame=df, x=PLOT_XY[0], y=PLOT_XY[1], color=selected_color, color_continuous_scale='Viridis',
         labels={selected_color: selected_color},
