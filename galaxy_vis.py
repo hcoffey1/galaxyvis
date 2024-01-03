@@ -34,12 +34,13 @@ selected_features = manga_data[2]
 excluded_labels = ['mangaid', 'pc1', 'pc2', 'tsne1', 'tsne2', 'iso1', 'iso2']
 
 label_df = merge_df.drop(excluded_labels, axis=1, errors='ignore')
+label_df_decals = decals_data[1].drop(excluded_labels, axis=1, errors='ignore')
 
 embedding_options=['pca', 'tsne']
 clustering_options=['agglomerative', 'hdbscan', 'kmeans', 'meanshift']
 
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
-app.layout = get_page_layout(label_df, embedding_options, clustering_options, selected_features)
+app.layout = get_page_layout(label_df, label_df_decals, embedding_options, clustering_options, selected_features, decals_data[2])
 
 # Callback to handle header checkbox changes
 @app.callback(
@@ -57,8 +58,8 @@ def update_checklists(galaxy_zoo_header, firefly_header):
 
 # Callback to hide/show the embedding parameters based on choice 
 @app.callback(
-    Output('embedding-param-container', 'style'),
-    Input('embedding-selector', 'value'),
+    Output('manga-embedding-param-container', 'style'),
+    Input('manga-embedding-selector', 'value'),
     prevent_initial_call=True,
 )
 def update_embedding_param_visibility(selected_option):
@@ -74,20 +75,20 @@ def update_embedding_param_visibility(selected_option):
     return {'display': 'none'} if selected_option != 'kmeans' and selected_option != 'agglomerative' else {'display': 'block'}
 
 @app.callback(
-    Output('scatterplot', 'figure'),
+    Output('manga-scatterplot', 'figure'),
     Output('clusterscatter', 'figure'),
     Output('barplot', 'figure'),
     Output('clusterline', 'figure'),
     Output('regen-button', 'n_clicks'),
     Output('regen-cluster-button', 'n_clicks'),
 
-    Input('color-selector', 'value'),
+    Input('manga-color-selector', 'value'),
     Input('regen-button', 'n_clicks'),
     Input('regen-cluster-button', 'n_clicks'),
 
-    State('embedding-selector', 'value'),
-    State('perplexity-input', 'value'),
-    State('tsne-seed-input', 'value'),
+    State('manga-embedding-selector', 'value'),
+    State('manga-perplexity-input', 'value'),
+    State('manga-tsne-seed-input', 'value'),
     State('clustering-selector', 'value'),
     State('k-input', 'value'),
     State('k-seed-input', 'value'),
@@ -140,8 +141,8 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
     return fig, clusterscatterfig, barfig, cluster_line_fig, 0, 0
 
 @app.callback(
-    Output('scatterplot', 'config'),
-    Input('scatterplot', 'clickData'),
+    Output('manga-scatterplot', 'config'),
+    Input('manga-scatterplot', 'clickData'),
     prevent_initial_call=True,
 )
 def click_data_point(clickData):

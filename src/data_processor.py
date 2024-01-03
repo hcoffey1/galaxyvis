@@ -368,8 +368,6 @@ def prepare_data(file_path):
     #Merge dataframes
     merge_df_manga, selected_features_manga = merge_data(data_pairs_manga, 'MANGAID')
     merge_df_decals, selected_features_decals = merge_data(data_pairs_decals, 'iauname')
-    print(merge_df_decals)
-    print(selected_features_decals)
 
     #print(selected_features)
     merge_df_manga.rename(columns={col: col.lower() for col in merge_df_manga.columns}, inplace=True)

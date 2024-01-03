@@ -11,49 +11,63 @@ TITLE = "GalaxyVis"
 MANGA_LAYOUT = None
 DECALS_LAYOUT = None
 
-def init_decals_layout():
-    global DECALS_LAYOUT
-    DECALS_LAYOUT = html.Div(html.H2('DECaLS'))
-
-def init_manga_layout(label_df, embedding_options, clustering_options, features):
-    global MANGA_LAYOUT
-
-    highlight_feature_div = html.Div([
+def get_highlight_feature_div(id, label_df):
+    return html.Div([
             html.B("Highlighted Feature:"),
             dcc.Dropdown(
-                id="color-selector",
+                id=id+"-color-selector",
                 options=[{'label': col, 'value': col} for col in label_df.columns],
                 value=label_df.columns[0],  # Initial value
             ),
         ], style={'width': '50%'})
 
-    scatter_plot_div = html.Div([
+def get_scatter_plot_div(id):
+    return html.Div([
         dcc.Loading(
-            id='loading-indicator',
+            id=id+'-loading-indicator',
             type='circle',  # or 'default'
             children=[
-                dcc.Graph(id='scatterplot'),
+                dcc.Graph(id=id+'-scatterplot'),
                 ]
             ),
         ], style={'flex': '1', 'width': '50%'})
-    
-    embedding_method_div = html.Div([
+
+def get_embedding_method_div(id, embedding_options):
+    return html.Div([
             html.B("Embedding Method"),
-            dcc.Dropdown(id="embedding-selector", 
+            dcc.Dropdown(id=id+"-embedding-selector", 
             options=[{'label': option, 'value': option} for option in embedding_options],
             value=embedding_options[0]
             ),
-            html.Div(id='embedding-param-container', children=[
+            html.Div(id=id+'-embedding-param-container', children=[
                 html.Div([
                     html.Label("Perplexity:"),
-                    dcc.Input(id='perplexity-input', type='number', value=100),
+                    dcc.Input(id=id+'-perplexity-input', type='number', value=100),
                 ]),
                 html.Div([
                     html.Label("Random Seed (-1 : Random):"),
-                    dcc.Input(id='tsne-seed-input', type='number', value=-1),
+                    dcc.Input(id=id+'-tsne-seed-input', type='number', value=-1),
                 ]),
             ], style={'display': 'none'})
         ], style={'width': '25%'})
+
+def init_decals_layout(label_df, embedding_options):
+    global DECALS_LAYOUT
+    highlight_feature_div = get_highlight_feature_div('decals',label_df)
+
+    scatter_plot_div = get_scatter_plot_div('decals')
+
+    embedding_method_div = get_embedding_method_div('decals',embedding_options)
+    DECALS_LAYOUT = html.Div([html.H2('DECaLS'), highlight_feature_div, scatter_plot_div, embedding_method_div])
+
+def init_manga_layout(label_df, embedding_options, clustering_options, features):
+    global MANGA_LAYOUT
+
+    highlight_feature_div = get_highlight_feature_div('manga',label_df)
+
+    scatter_plot_div = get_scatter_plot_div('manga')
+
+    embedding_method_div = get_embedding_method_div('manga',embedding_options)
 
     clustering_method_div = html.Div([
             html.B("Clustering Method"),
@@ -264,9 +278,9 @@ def get_cluster_bar_fig(df):
     return barfig
 
 
-def get_page_layout(label_df, embedding_options, clustering_options, features):
-    init_manga_layout(label_df,embedding_options, clustering_options,features)
-    init_decals_layout()
+def get_page_layout(label_df_manga, label_df_decals, embedding_options, clustering_options, features_manga, features_decals):
+    init_manga_layout(label_df_manga,embedding_options, clustering_options,features_manga)
+    init_decals_layout(label_df_decals, embedding_options)
 
     return html.Div([
         dcc.Location(id='url', refresh=False),
