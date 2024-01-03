@@ -72,7 +72,7 @@ def get_embedding_layout_div(id, label_df, embedding_options, features_list):
             ], style={'width': '50%'}, id=id+'-features-list'),
         ], style={'display': 'flex'})])
 
-def init_decals_layout(label_df, embedding_options, features):
+def init_decals_layout(label_df, embedding_options, features, decals_df):
     global DECALS_LAYOUT
 
     features_list = create_features_list(features)
@@ -80,7 +80,7 @@ def init_decals_layout(label_df, embedding_options, features):
 
     embedding_div = get_embedding_layout_div('decals', label_df, embedding_options, features_list)
 
-    DECALS_LAYOUT = html.Div([html.H2('DECaLS'), embedding_div])
+    DECALS_LAYOUT = html.Div([html.H2('DECaLS'),dcc.Store(id='decals-embedding-data'), dcc.Store(id='decals-data', data=decals_df.reset_index(drop=True).to_json(orient='split')), embedding_div])
 
 def init_manga_layout(label_df, embedding_options, clustering_options, features):
     global MANGA_LAYOUT
@@ -284,15 +284,18 @@ def get_cluster_bar_fig(df):
     return barfig
 
 
-def get_page_layout(label_df_manga, label_df_decals, embedding_options, clustering_options, features_manga, features_decals):
+def get_page_layout(label_df_manga, label_df_decals, embedding_options, clustering_options, features_manga, features_decals, decals_df):
     init_manga_layout(label_df_manga,embedding_options, clustering_options,features_manga)
-    init_decals_layout(label_df_decals, embedding_options, features_decals)
+    init_decals_layout(label_df_decals, embedding_options, features_decals, decals_df)
 
     return html.Div([
         dcc.Location(id='url', refresh=False),
         html.H1(TITLE),
         html.Button('Switch survey', id='switch-button'),
         html.Div(id='page-content'),
+        dcc.Store(id='current-embedding'),
+        dcc.Store(id='current-clustering'),
+        dcc.Store(id='current-xy')
     ])
 
 
