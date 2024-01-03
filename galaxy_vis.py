@@ -4,6 +4,7 @@
 import dash
 from dash.dependencies import Input, Output, State, ALL
 from dash import ctx
+from io import StringIO
 import pandas as pd
 import time
 
@@ -17,10 +18,7 @@ from src.layout import get_page_layout, get_scatter_fig, get_cluster_scatter_fig
 
 from src.data_processor import run_embedding, run_clustering, prepare_data 
 
-PLOT_XY = []
-
-CURRENT_EMBEDDING = None
-CURRENT_CLUSTERING = None
+from src.decals_callback import decals_callbacks
 
 def create_directory(directory_path):
     if not os.path.exists(directory_path):
@@ -43,8 +41,10 @@ label_df_decals = decals_merge_df.drop(excluded_labels, axis=1, errors='ignore')
 embedding_options=['pca', 'tsne']
 clustering_options=['agglomerative', 'hdbscan', 'kmeans', 'meanshift']
 
-app = dash.Dash(__name__, suppress_callback_exceptions=True)
-app.layout = get_page_layout(label_df, label_df_decals, embedding_options, clustering_options, manga_selected_features, decals_selected_features)
+#    return [decals_merge_df.reset_index().to_json(orient='split')]
+app = dash.Dash(__name__, suppress_callback_exceptions=False)
+app.layout = get_page_layout(label_df, label_df_decals, embedding_options, clustering_options, manga_selected_features, decals_selected_features, decals_merge_df)
+decals_callbacks(app)
 
 # Callback to handle header checkbox changes
 @app.callback(
@@ -77,73 +77,6 @@ def update_embedding_param_visibility(selected_option):
 )
 def update_embedding_param_visibility(selected_option):
     return {'display': 'none'} if selected_option != 'kmeans' and selected_option != 'agglomerative' else {'display': 'block'}
-
-@app.callback(
-    Output('decals-scatterplot', 'figure'),
-    #Output('clusterscatter', 'figure'),
-    #Output('barplot', 'figure'),
-    #Output('clusterline', 'figure'),
-    Output('decals-regen-button', 'n_clicks'),
-    #Output('regen-cluster-button', 'n_clicks'),
-
-    Input('decals-color-selector', 'value'),
-    Input('decals-regen-button', 'n_clicks'),
-    #Input('regen-cluster-button', 'n_clicks'),
-
-    State('decals-embedding-selector', 'value'),
-    State('decals-perplexity-input', 'value'),
-    State('decals-tsne-seed-input', 'value'),
-    #State('clustering-selector', 'value'),
-    #State('k-input', 'value'),
-    #State('k-seed-input', 'value'),
-    State('decals-features-list', 'children'),
-    prevent_initial_call=True,
-)
-def update_scatterplot(selected_color, embedding_n_clicks,
-                        embedding_choice, perplexity, tsne_seed,
-                        list_values):
-    #global df
-    global PLOT_XY 
-    global decals_numeric_df 
-    global decals_merge_df 
-    global CURRENT_EMBEDDING
-    global CURRENT_CLUSTERING 
-
-    #Run embedding and clustering
-    if ctx.triggered_id == "decals-regen-button" and embedding_n_clicks:
-        print("Running Embedding + Clustering:")
-        start_time = time.time()
-        features = []
-        for c in (list_values[2]['props']['children'][1:]):
-            features += (c['props']['children'][1]['props']['value'])
-        print("Features selected: ", features)
-
-        dim_red_df,PLOT_XY = run_embedding(decals_numeric_df, features, embedding_choice, perplexity, tsne_seed)
-        CURRENT_EMBEDDING = embedding_choice
-
-        decals_merge_df = pd.concat([decals_numeric_df, decals_merge_df['iauname'], dim_red_df], axis=1, ignore_index=False)
-        #merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
-        end_time = time.time()
-        elapsed_time = end_time - start_time 
-        print("Embedding + Clustering Time taken : {} s".format(elapsed_time))
-
-        #CURRENT_CLUSTERING = clustering_choice 
-
-    #Run only clustering
-    #elif ctx.triggered_id == "regen-cluster-button" and cluster_n_clicks:
-    #    merge_df['cluster'] = run_clustering(dim_red_df, clustering_choice, num_k, k_seed) 
-    #    CURRENT_CLUSTERING = clustering_choice 
-
-    df = decals_merge_df
-    #df = df.sort_values(by='cluster', ascending=True)
-
-    fig = get_scatter_fig(df, selected_color, PLOT_XY, 'iauname')
-    #clusterscatterfig = get_cluster_scatter_fig(df, PLOT_XY)
-    #cluster_line_fig = get_cluster_line_fig(df)
-    #barfig = get_cluster_bar_fig(df)
-
-    return fig, 0
-    #return fig, clusterscatterfig, barfig, cluster_line_fig, 0, 0
 
 @app.callback(
     Output('manga-scatterplot', 'figure'),
@@ -279,17 +212,20 @@ def cluster_click_data_point(clickData):
     Output('output-message', 'children'),
     Output('export-cluster-button', 'n_clicks'),
     Input('export-cluster-button', 'n_clicks'),
+    Input('current-embedding', 'data'),
+    Input('current-clustering', 'data'),
     prevent_initial_call=True,
 )
-def update_message(n_clicks):
+def update_message(n_clicks, cur_embedding, cur_clustering):
     global manga_merge_df
+
 
     if n_clicks is None:
         return '',0  # Initial state, no message
     else:
         timestamp = datetime.now()
         formatted_timestamp = timestamp.strftime("%Y-%m-%d-%H:%M:%S")
-        outputfile = f'{CURRENT_EMBEDDING}_{CURRENT_CLUSTERING}_{formatted_timestamp}.csv'
+        outputfile = f'{cur_embedding}_{cur_clustering}_{formatted_timestamp}.csv'
 
         output_dir = './clusters/'
 
