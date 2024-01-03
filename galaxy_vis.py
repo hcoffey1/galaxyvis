@@ -144,28 +144,6 @@ def update_scatterplot(selected_color, embedding_n_clicks, cluster_n_clicks,
 
     return fig, clusterscatterfig, barfig, cluster_line_fig, 0, 0
 
-@app.callback(
-    Output('decals-scatterplot', 'config'),
-    Input('decals-scatterplot', 'clickData'),
-    prevent_initial_call=True,
-)
-def click_data_point(clickData):
-    global decals_merge_df
-
-    if clickData is None:
-        return {'editable': True}
-    else:
-        clicked_point_data = clickData['points'][0]
-        
-        ID = clicked_point_data['hovertext'] 
-        row = (decals_merge_df.loc[decals_merge_df['iauname'] == ID])
-        url = "https://www.legacysurvey.org/viewer?ra=" + str(row['ra']) + "&dec=" + str(row['dec']) + "&layer=ls-dr10&zoom=16"
-
-        # Check if a URL exists for the clicked point
-        if url:
-            webbrowser.open_new_tab(url)  # Open the URL in a new tab
-
-        return {'editable': True}
 
 @app.callback(
     Output('manga-scatterplot', 'config'),

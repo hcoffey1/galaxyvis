@@ -53,6 +53,8 @@ def decals_callbacks(app):
 		decals_merge_df = (pd.read_json(StringIO(decals_data), orient='split'))
 		decals_numeric_df = decals_merge_df.drop("iauname", axis=1)
 
+		updated_embeddings = None
+		fig = None
 		if decals_embedding_data:
 			dim_red_df = (pd.read_json(StringIO(decals_embedding_data), orient='split'))
 
@@ -66,6 +68,7 @@ def decals_callbacks(app):
 			print("Features selected: ", features)
 
 			dim_red_df,cur_xy = run_embedding(decals_numeric_df, features, embedding_choice, perplexity, tsne_seed)
+			updated_embeddings = dim_red_df.reset_index(drop=True).to_json(orient='split')
 			cur_embedding = embedding_choice
 
 			decals_merge_df = pd.concat([decals_numeric_df, decals_merge_df['iauname'], dim_red_df], axis=1, ignore_index=False)
@@ -77,6 +80,8 @@ def decals_callbacks(app):
 			#cur_clustering = clustering_choice 
 		else:
 			decals_merge_df = pd.concat([decals_merge_df, dim_red_df], axis=1, ignore_index=False)
+
+			updated_embeddings = dim_red_df.reset_index(drop=True).to_json(orient='split')
 
 		#Run only clustering
 		#elif ctx.triggered_id == "regen-cluster-button" and cluster_n_clicks:
@@ -91,5 +96,30 @@ def decals_callbacks(app):
 		#cluster_line_fig = get_cluster_line_fig(df)
 		#barfig = get_cluster_bar_fig(df)
 
-		return fig, 0, dim_red_df.reset_index(drop=True).to_json(orient='split'), cur_embedding, cur_clustering, cur_xy
+		return fig, 0, updated_embeddings, cur_embedding, cur_clustering, cur_xy
 		#return fig, clusterscatterfig, barfig, cluster_line_fig, 0, 0
+	
+
+	@app.callback(
+		Output('decals-scatterplot', 'config'),
+		Input('decals-scatterplot', 'clickData'),
+		State('decals-data', 'data'),
+		prevent_initial_call=True,
+	)
+	def click_data_point(clickData, decals_data):
+		decals_merge_df = (pd.read_json(StringIO(decals_data), orient='split'))
+
+		if clickData is None:
+			return {'editable': True}
+		else:
+			clicked_point_data = clickData['points'][0]
+			
+			ID = clicked_point_data['hovertext'] 
+			row = (decals_merge_df.loc[decals_merge_df['iauname'] == ID])
+			url = "https://www.legacysurvey.org/viewer?ra=" + str(row['ra']) + "&dec=" + str(row['dec']) + "&layer=ls-dr10&zoom=16"
+
+			# Check if a URL exists for the clicked point
+			if url:
+				webbrowser.open_new_tab(url)  # Open the URL in a new tab
+
+			return {'editable': True}

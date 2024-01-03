@@ -178,7 +178,7 @@ def create_features_list(features):
 
 def get_scatter_fig(df, selected_color, PLOT_XY, hovername):
     fig = px.scatter(
-        df, x=PLOT_XY[0], y=PLOT_XY[1], color=selected_color, color_continuous_scale='Viridis',
+        data_frame=df, x=PLOT_XY[0], y=PLOT_XY[1], color=selected_color, color_continuous_scale='Viridis',
         labels={selected_color: selected_color},
         hover_name=hovername,
         title='Interactive Scatterplot with Color Selector',
