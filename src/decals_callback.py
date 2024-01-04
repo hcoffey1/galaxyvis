@@ -1,19 +1,14 @@
-import dash
-from dash.dependencies import Input, Output, State, ALL
+from dash.dependencies import Input, Output, State 
 from dash import ctx
 from io import StringIO
 import pandas as pd
 import time
 
-from datetime import datetime
-import os
-
 import webbrowser
 
-from src.layout import get_page_layout, get_scatter_fig, get_cluster_scatter_fig, \
-    get_cluster_line_fig, get_cluster_bar_fig, swap_layout
+from src.layout import get_scatter_fig
 
-from src.data_processor import run_embedding, run_clustering, prepare_data 
+from src.data_processor import run_embedding
 
 def decals_callbacks(app):
 	@app.callback(
@@ -23,9 +18,9 @@ def decals_callbacks(app):
 		#Output('clusterline', 'figure'),
 		Output('decals-regen-button', 'n_clicks'),
 		Output('decals-embedding-data', 'data'),
-		Output('current-embedding', 'data'),
-		Output('current-clustering', 'data'),
-		Output('current-xy', 'data'),
+		Output('decals-current-embedding', 'data'),
+		Output('decals-current-clustering', 'data'),
+		Output('decals-current-xy', 'data'),
 		#Output('regen-cluster-button', 'n_clicks'),
 
 		Input('decals-color-selector', 'value'),
@@ -41,9 +36,9 @@ def decals_callbacks(app):
 		State('decals-features-list', 'children'),
 		State('decals-data', 'data'),
 		State('decals-embedding-data', 'data'),
-		State('current-embedding', 'data'),
-		State('current-clustering', 'data'),
-		State('current-xy', 'data'),
+		State('decals-current-embedding', 'data'),
+		State('decals-current-clustering', 'data'),
+		State('decals-current-xy', 'data'),
 		#State('decals-plot-xy', 'data'),
 		prevent_initial_call=True,
 	)

@@ -75,16 +75,25 @@ def get_embedding_layout_div(id, label_df, embedding_options, features_list):
 def init_decals_layout(label_df, embedding_options, features, decals_df):
     global DECALS_LAYOUT
 
+    id = 'decals'
+
     features_list = create_features_list(features)
     features_list.insert(0, html.Summary('Input Features'))
 
-    embedding_div = get_embedding_layout_div('decals', label_df, embedding_options, features_list)
+    embedding_div = get_embedding_layout_div(id, label_df, embedding_options, features_list)
 
-    DECALS_LAYOUT = html.Div([html.H2('DECaLS'),dcc.Store(id='decals-embedding-data'), dcc.Store(id='decals-data', data=decals_df.reset_index(drop=True).to_json(orient='split')), embedding_div])
+    DECALS_LAYOUT = html.Div([
+        html.H2('DECaLS'),dcc.Store(id=id+'-embedding-data'), 
+        dcc.Store(id=id+'-data', data=decals_df.reset_index(drop=True).to_json(orient='split')), 
+        dcc.Store(id=id+'-current-embedding'),
+        dcc.Store(id=id+'-current-clustering'),
+        dcc.Store(id=id+'-current-xy'),
+        embedding_div])
 
-def init_manga_layout(label_df, embedding_options, clustering_options, features):
+def init_manga_layout(label_df, embedding_options, clustering_options, features, manga_df):
     global MANGA_LAYOUT
-
+    
+    id = 'manga'
     clustering_method_div = html.Div([
             html.B("Clustering Method"),
             dcc.Dropdown(id="clustering-selector", 
@@ -122,11 +131,16 @@ def init_manga_layout(label_df, embedding_options, clustering_options, features)
 
     features_list.insert(0, html.Summary('Input Features'))
 
-    embedding_layout = get_embedding_layout_div('manga', label_df, embedding_options, features_list)
+    embedding_layout = get_embedding_layout_div(id, label_df, embedding_options, features_list)
 
     MANGA_LAYOUT = html.Div([
         html.H2("MaNGA"),
         html.P("Galaxy Count: {}".format(label_df.shape[0])),
+        dcc.Store(id='manga-embedding-data'), 
+        dcc.Store(id='manga-data', data=manga_df.reset_index(drop=True).to_json(orient='split')),
+        dcc.Store(id=id+'-current-embedding'),
+        dcc.Store(id=id+'-current-clustering'),
+        dcc.Store(id=id+'-current-xy'),
 
         embedding_layout,
 
@@ -198,6 +212,8 @@ def get_scatter_fig(df, selected_color, PLOT_XY, hovername):
     return fig
 
 def get_cluster_scatter_fig(df, PLOT_XY):
+    if 'cluster' not in df:
+        return px.scatter()
     clusterscatterfig = px.scatter(
         df, x=PLOT_XY[0], y=PLOT_XY[1], color='cluster', color_continuous_scale='Viridis',
         labels={'cluster': 'cluster'},
@@ -216,6 +232,8 @@ def get_cluster_scatter_fig(df, PLOT_XY):
     return clusterscatterfig
 
 def get_cluster_line_fig(df):
+    if 'cluster' not in df:
+        return px.scatter()
     grouped = df.groupby(['cluster', 'ttype']).size().reset_index(name='count')
 
     # Calculate the total count for each cluster
@@ -252,6 +270,8 @@ def get_cluster_line_fig(df):
     return fig
 
 def get_cluster_bar_fig(df):
+    if 'cluster' not in df:
+        return px.bar()
     cluster_perc = pd.DataFrame(df['cluster'].value_counts(normalize=True)*100).reset_index()
     cluster_perc['group'] = ''
     cluster_perc['cluster'] = cluster_perc['cluster']
@@ -287,8 +307,8 @@ def get_cluster_bar_fig(df):
     return barfig
 
 
-def get_page_layout(label_df_manga, label_df_decals, embedding_options, clustering_options, features_manga, features_decals, decals_df):
-    init_manga_layout(label_df_manga,embedding_options, clustering_options,features_manga)
+def get_page_layout(label_df_manga, label_df_decals, embedding_options, clustering_options, features_manga, features_decals, decals_df, manga_df):
+    init_manga_layout(label_df_manga,embedding_options, clustering_options,features_manga, manga_df)
     init_decals_layout(label_df_decals, embedding_options, features_decals, decals_df)
 
     return html.Div([
@@ -296,9 +316,6 @@ def get_page_layout(label_df_manga, label_df_decals, embedding_options, clusteri
         html.H1(TITLE),
         html.Button('Switch survey', id='switch-button'),
         html.Div(id='page-content'),
-        dcc.Store(id='current-embedding'),
-        dcc.Store(id='current-clustering'),
-        dcc.Store(id='current-xy')
     ])
 
 
