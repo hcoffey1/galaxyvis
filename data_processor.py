@@ -21,6 +21,11 @@ def read_fits(fits_path, hdu=1):
     if 'MANGAID' in df:
         df['MANGAID'] = df['MANGAID'].str.decode('utf-8')
         df['MANGAID'] = df['MANGAID'].str.strip()
+    if 'PLATEIFU' in df:
+        df.drop('PLATEIFU', axis=1)
+    elif 'plateifu' in df:
+        df['plateifu'] = df['plateifu'].str.decode('utf-8')
+        df['plateifu'] = df['plateifu'].str.strip()
     return df
 
 

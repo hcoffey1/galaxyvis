@@ -1,6 +1,7 @@
 import warnings
 import numpy as np
 import pandas as pd
+import os
 
 from astropy.io import fits
 from matplotlib import pyplot as plt
@@ -90,6 +91,14 @@ def get_file_path(base_path, df, i):
     file = path + f'manga-{plate}-{ifu}-MAPS-HYB10-MILESHC-MASTARSSP.fits.gz'
     return file
 
+def get_file_path_str(base_path, plateifu):
+    plateifu_split = plateifu.split('-')
+    plate = int((plateifu_split[0]))
+    ifu = int((plateifu_split[1]))
+    path = base_path + f'{plate}/{ifu}/'
+    file = path + f'manga-{plate}-{ifu}-MAPS-HYB10-MILESHC-MASTARSSP.fits.gz'
+    return file
+
 def read_fits(fits_path, hdu=1):
     dat = Table.read(fits_path, format='fits', hdu=hdu)
     names = [name for name in dat.colnames if len(dat[name].shape) <= 1]
@@ -98,6 +107,127 @@ def read_fits(fits_path, hdu=1):
         df['MANGAID'] = df['MANGAID'].str.decode('utf-8')
         df['MANGAID'] = df['MANGAID'].str.strip()
     return df
+
+def get_spaxel_bpt_percent(file):
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning, \
+            message="(invalid value|divide by zero) encountered in (log10|divide)")
+
+        with fits.open(file) as hdu:
+            tmp_df = create_df(hdu)
+
+            label_percentages = pd.DataFrame()
+            #label_percentages[1.0] = int(0)
+
+            if not tmp_df.empty:
+                df_labeled = get_bpt_labels(tmp_df)
+
+                #Get count and % of each label type
+                label_counts = df_labeled['BPT_class'].value_counts()
+                label_percentages = (label_counts / len(df_labeled)) * 100
+                label_percentages['bpt_error'] = 0
+            
+            else:
+                label_percentages = pd.Series({1.0: 0, 2.0: 0, 3.0: 0, 0.0: 0, 'bpt_error': 1})
+
+
+            labels = [1.0, 2.0, 3.0, 0.0]
+
+            #Fill in 0 if no spaxels in category
+            for l in labels:
+                if l not in label_percentages:
+                    label_percentages[l] = 0
+
+            return label_percentages
+
+        #   #Plot bpt figure 
+        #   #plot_bpt(df_labeled)
+
+#Take df with 'plateifu' column and get bpt spaxel data
+def prepare_bpt_data(df):
+    base_path = 'https://data.sdss.org/sas/dr17/manga/spectro/analysis/v3_1_1/3.1.0/HYB10-MILESHC-MASTARSSP/'
+    cache_path = './data/_cached_bpt.csv'
+    
+    bpt_df = None
+    bpt_data = []
+
+    #cached_bpt_df = None
+
+    if os.path.exists(cache_path):
+        print("BPT Cache hit! Reading csv...")
+        bpt_df = pd.read_csv(cache_path)
+
+
+    #TODO: Figure out merging cache and new data. pandas is being miserable 
+    #print("BPT Cache miss! Downloading files...")
+    #for i in range(len(df['plateifu'])):
+    else:
+        #for i in range(20):
+        for i in range(len(df['plateifu'])):
+
+            #if cached_bpt_df is not None:
+            #    plateid = df['plateifu'][i]
+
+            #    #TODO: Potentially retry downloading entries that errored out before
+            #    if cached_bpt_df['plateifu'].str.contains(plateid).any():
+            #        #and int(cached_bpt_df[cached_bpt_df['plateifu'] == plateid].iloc[0]['bpt_error']) == 0:
+            #        continue
+            #    else:
+            #        print("Cache Miss!", plateid)
+
+
+            file = get_file_path_str(base_path, df['plateifu'][i])
+            print("Processing", i, ':' , file)
+
+            try:
+                bpt_class = get_spaxel_bpt_percent(file)
+
+                bpt_class['plateifu'] = df['plateifu'][i]
+                print(bpt_class)
+
+                bpt_data_row = {'plateifu': df['plateifu'][i], 
+                    1.0: bpt_class[1.0],
+                    2.0: bpt_class[2.0],
+                    3.0: bpt_class[3.0],
+                    0.0: bpt_class[0.0],
+                    'bpt_error': bpt_class['bpt_error'],
+                    }
+
+            except:
+                bpt_data_row = {'plateifu': df['plateifu'][i], 
+                    1.0: 0,
+                    2.0: 0,
+                    3.0: 0,
+                    0.0: 0,
+                    'bpt_error': 1,
+                    }
+
+            bpt_data.append(bpt_data_row)
+
+            bpt_df = pd.DataFrame(bpt_data)
+            bpt_df.to_csv(cache_path, index=False)
+
+    #print('---')
+    #print(bpt_df)
+    #print('+++')
+    #print(cached_bpt_df)
+
+
+    #print('---')
+    #bpt_df = pd.concat([bpt_df, cached_bpt_df], ignore_index=True)
+    #bpt_df = pd.merge(bpt_df, cached_bpt_df, on='plateifu', how='outer')
+    #bpt_df = bpt_df.combine_first(cached_bpt_df)
+    #bpt_df = (bpt_df.merge(cached_bpt_df, left_on='plateifu', right_on='plateifu', ignore_index=True))
+
+    #print(bpt_df)
+
+
+    assert bpt_df is not None
+
+    print(bpt_df)
+
+    return bpt_df
+
 
 def main():
     base_path = 'https://data.sdss.org/sas/dr17/manga/spectro/analysis/v3_1_1/3.1.0/HYB10-MILESHC-MASTARSSP/'
@@ -108,21 +238,8 @@ def main():
         file = get_file_path(base_path, df_drpall, i)
         print("Processing: ", file)
 
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning, \
-                message="(invalid value|divide by zero) encountered in (log10|divide)")
+        print(get_spaxel_bpt_percent(file))
 
-            with fits.open(file) as hdu:
-                df = create_df(hdu)
-                df_labeled = get_bpt_labels(df)
-
-                #Get count and % of each label type
-                label_counts = df_labeled['BPT_class'].value_counts()
-                label_percentages = (label_counts / len(df_labeled)) * 100
-                print(label_percentages)
-
-                #Plot bpt figure 
-                #plot_bpt(df_labeled)
 
 if __name__ == "__main__":
     main()

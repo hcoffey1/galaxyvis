@@ -223,7 +223,7 @@ def get_page_layout(label_df, embedding_options, clustering_options, firefly_str
                 ]
             ),
     ], style={'width': '50%'})
-     
+
     features_list = create_features_list(features)
 
     features_list.insert(0, html.Summary('Input Features'))
