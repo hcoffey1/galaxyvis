@@ -24,6 +24,7 @@ from layout import get_page_layout, get_scatter_fig, get_cluster_scatter_fig, \
     get_cluster_line_fig, get_cluster_bar_fig
 
 from data_processor import read_data
+from src.bpt import prepare_bpt_data 
 
 PLOT_XY = []
 
@@ -151,6 +152,7 @@ data_pairs = (read_data("./data"))
 merge_df = data_pairs[0][1]
 selected_features = [[data_pairs[0][0]['label'], data_pairs[0][2]]]
 for pair in data_pairs[1:]:
+    pair[1] = pair[1].drop('PLATEIFU', axis=1)
     merge_df = (merge_df.merge(pair[1], left_on='MANGAID', right_on='MANGAID'))
     selected_features += [[pair[0]['label'], pair[2]]]
 
@@ -158,11 +160,22 @@ for pair in data_pairs[1:]:
 merge_df.rename(columns={col: col.lower() for col in merge_df.columns}, inplace=True)
 print("MERGE LEN: ", len(merge_df))
 
+#Get bpt data and filter out entries with errors
+bpt_data = prepare_bpt_data(merge_df)
+bpt_data = bpt_data[bpt_data['bpt_error'] == 0]
+
+merge_df = merge_df.drop_duplicates(subset=['plateifu'])
+bpt_data = bpt_data.drop_duplicates(subset=['plateifu'])
+
+merge_df = (bpt_data.merge(merge_df, on='plateifu', how='inner' ))
+
+selected_features.append(['BPT', ['bpt_0.0', 'bpt_1.0', 'bpt_2.0', 'bpt_3.0']])
+
 #Remove non-numeric data
 numeric_df = get_numeric_df(merge_df)
 
 #Select features of interest
-firefly_str = ["lw_age_1re", "mw_age_1re", "lw_z_1re", "mw_z_1re", "redshift", "photometric_mass"]
+firefly_str = ["lw_age_1re", "mw_age_1re", "lw_z_1re", "mw_z_1re", "redshift", "photometric_mass", "bpt_0.0", "bpt_1.0", "bpt_2.0", "bpt_3.0"]
 meta_str = ["ttype", "unsure"]
 debiased_columns = [
     col for col in numeric_df.columns if "debiased" in col #Galaxy Zoo
@@ -184,13 +197,14 @@ dim_red_df,PLOT_XY = run_pca(scaled_df)
 CURRENT_EMBEDDING = 'pca' 
 
 merge_df = pd.concat([numeric_df, merge_df['mangaid'], dim_red_df], axis=1, ignore_index=False)
+#merge_df = pd.concat([numeric_df, merge_df['mangaid'], merge_df['plateifu'], dim_red_df], axis=1, ignore_index=False)
 
 merge_df['cluster'] = run_agglomerative(dim_red_df, 3) 
 CURRENT_CLUSTERING = 'agglomerative' 
 
 df = merge_df
 
-excluded_labels = ['mangaid', 'pc1', 'pc2', 'tsne1', 'tsne2', 'iso1', 'iso2']
+excluded_labels = ['mangaid', 'plateifu', 'pc1', 'pc2', 'tsne1', 'tsne2', 'iso1', 'iso2']
 
 label_df = df.drop(excluded_labels, axis=1, errors='ignore')
 
